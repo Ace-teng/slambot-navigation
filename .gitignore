@@ -1,0 +1,25 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Runtime data / large binaries
+src/xf_mic_asr_offline/tmp/
+src/xf_mic_asr_offline/audio/
+src/xf_mic_asr_offline/lib/
+src/xf_mic_asr_offline/feedback_voice/
+src/example/example/mediapipe_example/model/
+
+# Compiled kinematics shared objects
+*.so
+*.STL
+*.stl
+
+# SLAM maps (usually generated)
+src/slam/maps/*
+!src/slam/maps/.gitignore
