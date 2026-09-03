@@ -1,0 +1,18 @@
+web_bridge:
+  ros__parameters:
+    map_topic: map
+    scan_topic: scan
+    odom_topic: odom
+    tf_topic: tf
+    tf_static_topic: tf_static
+    map_frame: map
+    base_frame: base_footprint
+    max_map_cells: 16000000
+    max_scan_samples: 10000
+    pose_rate_hz: 10.0
+    scan_stale_sec: 2.0
+    odom_stale_sec: 2.0
+    pose_stale_sec: 1.0
+    map_stale_sec: 0.0
+    http_host: 127.0.0.1
+    http_port: 8080
