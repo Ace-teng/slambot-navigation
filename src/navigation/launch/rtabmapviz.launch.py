@@ -11,9 +11,11 @@ def generate_launch_description():
           'use_sim_time':use_sim_time,
           'subscribe_depth':True}]
 
+    # Orbbec publishes color topics remapped to 'rgb/*' (see peripherals/.../dabai_dcw.launch.py),
+    # so subscribe to /depth_cam/rgb/* here, consistent with the rtabmap include files.
     remappings=[
-          ('rgb/image', '/depth_cam/color/image_raw'), 
-          ('rgb/camera_info', '/depth_cam/color/camera_info'),
+          ('rgb/image', '/depth_cam/rgb/image_raw'),
+          ('rgb/camera_info', '/depth_cam/rgb/camera_info'),
           ('depth/image', '/depth_cam/depth/image_raw')]
 
     return LaunchDescription([

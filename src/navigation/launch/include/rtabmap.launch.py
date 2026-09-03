@@ -1,17 +1,20 @@
 from launch_ros.actions import Node
-from launch import LaunchDescription
+from launch import LaunchDescription, LaunchService
 from launch.substitutions import LaunchConfiguration
-from launch.conditions import IfCondition, UnlessCondition
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     qos = LaunchConfiguration('qos')
+    database_path = LaunchConfiguration('database_path')
 
     parameters={
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
+          # Database that was built by a mapping session
+          # (slam/.../include/rtabmap.launch.py). Loaded here for relocalization.
+          'database_path':database_path,
           'subscribe_rgbd':True,
           'subscribe_scan':True,
           'use_action_for_goal':True,
@@ -45,14 +48,26 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'qos', default_value='2',
             description='QoS used for input sensor topics'),
-            
+
+        DeclareLaunchArgument(
+            'database_path', default_value='~/.ros/rtabmap.db',
+            description='RTAB-Map database created by the mapping session. '
+                        'Loaded here to relocalize the robot inside it.'),
+
         # Nodes to launch
         Node(
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
-            parameters=[{'approx_sync':True, 'approx_sync_max_interval': 0.01, 'use_sim_time':use_sim_time, 'qos':qos}],
+            parameters=[{
+                'approx_sync': True,
+                'approx_sync_max_interval': 0.01,
+                'use_sim_time': use_sim_time,
+                'qos': qos,
+            }],
             remappings=remappings),
 
-        # Localization mode:
+        # Localization mode: disable mapping (Mem/IncrementalMemory=False) and load
+        # the whole map into working memory, so the robot relocalizes against the
+        # database built by the mapping session (see slam/.../include/rtabmap.launch.py).
         Node(
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters,

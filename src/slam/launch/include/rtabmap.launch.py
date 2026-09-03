@@ -1,17 +1,20 @@
 from launch_ros.actions import Node
-from launch import LaunchDescription
+from launch import LaunchDescription, LaunchService
 from launch.substitutions import LaunchConfiguration
-from launch.conditions import IfCondition, UnlessCondition
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     qos = LaunchConfiguration('qos')
+    database_path = LaunchConfiguration('database_path')
 
     parameters={
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
+          # Database this mapping session writes to. Set Mem/IncrementalMemory and
+          # load it again for localization (see navigation/.../include/rtabmap.launch.py).
+          'database_path':database_path,
           'subscribe_rgbd':True,
           'subscribe_scan':True,
           'use_action_for_goal':True,
@@ -48,14 +51,26 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'qos', default_value='2',
             description='QoS used for input sensor topics'),
-            
+
+        DeclareLaunchArgument(
+            'database_path', default_value='~/.ros/rtabmap.db',
+            description='RTAB-Map database that this mapping session writes to. '
+                        'Reuse the same path later for localization.'),
+
         # Nodes to launch
         Node(
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
-            parameters=[{'approx_sync':True, 'approx_sync_max_interval': 0.01, 'use_sim_time':use_sim_time, 'qos':qos}],
+            parameters=[{
+                'approx_sync': True,
+                'approx_sync_max_interval': 0.01,
+                'use_sim_time': use_sim_time,
+                'qos': qos,
+            }],
             remappings=remappings),
 
-        # SLAM Mode:
+        # SLAM Mode: '-d' clears the database on startup -> start a brand new map.
+        # The map is persisted to 'database_path' (or explicitly saved from rtabmapviz
+        # / with the map_saver action); load it in localization mode to relocalize.
         Node(
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters],
