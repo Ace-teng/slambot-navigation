@@ -7,6 +7,14 @@
   <maintainer email="1270161395@qq.com">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
+  <!-- Runtime packages required to actually run the launch chains in this package
+       (RTAB-Map localization, its base robot stack and the camera driver). -->
+  <exec_depend>rtabmap_sync</exec_depend>
+  <exec_depend>rtabmap_slam</exec_depend>
+  <exec_depend>orbbec_camera</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
