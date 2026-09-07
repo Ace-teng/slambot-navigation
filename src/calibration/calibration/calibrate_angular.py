@@ -86,37 +86,46 @@ class CalibrateAngular(Node):
 
     def main(self):
         while True:
-            self.update_param()
-            move_cmd = Twist()
-            if self.start_test:
-                # Get the current rotation angle from tf
-                original_angle = degrees(self.get_odom_angle())
-                self.test_angle = copysign(self.test_angle, self.reverse)
+            try:
+                self.update_param()
+                move_cmd = Twist()
+                if self.start_test:
+                    # Get the current rotation angle from tf (radians). On a TF
+                    # failure no feedback is available: stop instead of driving
+                    # on stale state.
+                    original_angle = self.get_odom_angle()
+                    if original_angle is None:
+                        self.cmd_vel.publish(Twist())
+                        time.sleep(0.05)
+                        continue
+                    self.test_angle = copysign(self.test_angle, self.reverse)
 
-                # Compute how far we have gone since the last measurement
-                delta_angle = self.odom_angular_scale_correction * normalize_angle(original_angle - self.last_angle)
+                    # Keep all angle bookkeeping in the same unit (degrees).
+                    original_deg = degrees(original_angle)
+                    delta_deg = self.odom_angular_scale_correction * (original_deg - self.last_angle)
+                    self.calib_angle += delta_deg
+                    self.last_angle = original_deg
 
-                # Add to our total angle so far
-                self.calib_angle += delta_angle
+                    error = self.test_angle - self.calib_angle
+                    if abs(error) > self.tolerance:
+                        # Rotate the robot to reduce the error
+                        move_cmd.angular.z = copysign(self.speed, error)
+                    else:
+                        self.calib_angle = 0.0
+                        self.start_test = rclpy.parameter.Parameter('start_test', rclpy.Parameter.Type.BOOL, False)
+                        all_new_parameters = [self.start_test]
+                        self.set_parameters(all_new_parameters)
+                        self.reverse = -self.reverse
+                        self.last_angle = 0
+                        self.get_logger().info('\033[1;32m%s\033[0m' % 'finish')
 
-                error = self.test_angle - self.calib_angle
-                # self.get_logger().info('\033[1;32moriginal:%f calib:%f\033[0m' % (original_angle, self.calib_angle))
-
-                self.last_angle = original_angle
-                if abs(error) > self.tolerance and self.start_test:
-                    # Rotate the robot to reduce the error
-                    move_cmd.angular.z = copysign(self.speed, error)
-                else:
-                    self.calib_angle = 0.0
-                    self.start_test  = rclpy.parameter.Parameter('start_test', rclpy.Parameter.Type.BOOL, False)
-                    all_new_parameters = [self.start_test]
-                    self.set_parameters(all_new_parameters)
-                    self.reverse = -self.reverse
-                    self.last_angle = 0
-                    self.get_logger().info('\033[1;32m%s\033[0m' % 'finish')
-
-            self.cmd_vel.publish(move_cmd)
-            time.sleep(0.05)
+                self.cmd_vel.publish(move_cmd)
+                time.sleep(0.05)
+            except Exception as exc:
+                # Keep the watchdog alive and stop instead of dying mid-motion.
+                self.get_logger().error('calibrate_angular main error: %s' % str(exc))
+                self.cmd_vel.publish(Twist())
+                time.sleep(0.05)
                 
     def get_odom_angle(self):
         # Get the current transform between the odom and base frames

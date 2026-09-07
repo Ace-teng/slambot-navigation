@@ -5,9 +5,9 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
-import sys, select, os
+import sys, select, os, time
 if os.name == 'nt':
-  import msvcrt, time
+  import msvcrt
 else:
   import tty, termios
 
@@ -34,7 +34,7 @@ CTRL-C to quit
 def getKey(settings):
     if os.name == 'nt':
         timeout = 0.1
-        startTime = rospy.get_time()
+        startTime = time.time()
         while True:
             if msvcrt.kbhit():
                 if sys.version_info[0] >= 3:
@@ -66,6 +66,7 @@ class TeleopControl(Node):
         last_x = 0
         last_z = 0
         count = 0
+        last_pub_time = 0.0
 
         try:
             print(msg)
@@ -121,9 +122,15 @@ class TeleopControl(Node):
                 twist.angular.y = 0.0
                 twist.angular.z = control_angular_vel
 
-                if last_x != control_linear_vel or last_z != control_angular_vel or control_angular_vel != 0:
+                # Re-publish held keys as a heartbeat so the controller-side
+                # watchdog does not stop the robot while a key is held down.
+                now = time.time()
+                motion_active = control_linear_vel != 0.0 or control_angular_vel != 0.0
+                changed = last_x != control_linear_vel or last_z != control_angular_vel
+                if changed or (motion_active and now - last_pub_time > 0.1):
                     self.cmd_vel.publish(twist)
-                
+                    last_pub_time = now
+
                 last_x = control_linear_vel
                 last_z = control_angular_vel
         except BaseException as e:

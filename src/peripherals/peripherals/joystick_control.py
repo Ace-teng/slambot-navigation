@@ -31,11 +31,16 @@ class JoystickController(Node):
         self.declare_parameter('max_angular', 3.0)
         self.declare_parameter('disable_servo_control', True)
         self.declare_parameter('machine_type', os.environ['MACHINE_TYPE'])
+        # Button index that must be HELD to move; -1 disables the deadman.
+        # The low-level controller keeps the last command until it receives a
+        # new one, so joystick input is re-published as a periodic heartbeat.
+        self.declare_parameter('deadman_button', -1)
 
         self.max_linear = self.get_parameter('max_linear').value
         self.max_angular = self.get_parameter('max_angular').value
         self.disable_servo_control = self.get_parameter('disable_servo_control').value
         self.machine = self.get_parameter('machine_type').value
+        self.deadman_button = int(self.get_parameter('deadman_button').value)
         self.get_logger().info('\033[1;32m%s\033[0m' % self.max_linear)
         # self.servo_pub = self.create_publisher(ServosPosition, 'servo_controller', 1)
         self.joy_sub = self.create_subscription(Joy, 'ros_robot_controller/joy', self.joy_callback, 1)
@@ -45,6 +50,10 @@ class JoystickController(Node):
         self.last_axes = dict(zip(AXES_MAP, [0.0, ] * len(AXES_MAP)))
         self.last_buttons = dict(zip(BUTTON_MAP, [0.0, ] * len(BUTTON_MAP)))
         self.mode = 0
+        # Heartbeat state so held sticks keep the controller-side watchdog alive
+        self._last_twist = None
+        self._publishing = False
+        self.create_timer(0.1, self.heartbeat_callback)
         self.create_service(Trigger, '~/init_finish', self.get_node_state)
         self.get_logger().info('\033[1;32m%s\033[0m' % 'start')
 
@@ -52,8 +61,33 @@ class JoystickController(Node):
         response.success = True
         return response
 
-    def axes_callback(self, axes):
+    def heartbeat_callback(self):
+        # Re-publish the current command periodically while a stick is held so a
+        # static axis value is not mistaken for a dead command source.
+        if self._publishing and self._last_twist is not None:
+            self.mecanum_pub.publish(self._last_twist)
+
+    def _deadman_held(self, buttons):
+        return self.deadman_button < 0 or (
+            0 <= self.deadman_button < len(buttons) and buttons[self.deadman_button] > 0.0)
+
+    def _publish_twist(self, twist):
+        self.mecanum_pub.publish(twist)
+        self._last_twist = twist
+        self._publishing = True
+
+    def _release(self):
+        self.mecanum_pub.publish(Twist())
+        self._last_twist = None
+        self._publishing = False
+
+    def axes_callback(self, axes, deadman_ok):
         twist = Twist()
+        if not deadman_ok:
+            # Stick released the deadman button while still deflected: revoke
+            # the motion command instead of letting it persist.
+            self._release()
+            return
         if abs(axes['lx']) < self.min_value:
             axes['lx'] = 0
         if abs(axes['ly']) < self.min_value:
@@ -64,7 +98,7 @@ class JoystickController(Node):
             axes['ry'] = 0
 
         if self.machine == 'JetRover_Mecanum':
-            twist.linear.y = val_map(axes['lx'], -1, 1, -self.max_linear, self.max_linear) 
+            twist.linear.y = val_map(axes['lx'], -1, 1, -self.max_linear, self.max_linear)
             twist.linear.x = val_map(axes['ly'], -1, 1, -self.max_linear, self.max_linear)
             twist.angular.z = val_map(axes['rx'], -1, 1, -self.max_angular, self.max_angular)
         elif self.machine == 'JetRover_Tank':
@@ -75,14 +109,17 @@ class JoystickController(Node):
             steering_angle = val_map(axes['rx'], -1, 1, -math.radians(150/1000*240), math.radians(150/1000*240))
             if twist.linear.x == 0:
                 twist.linear.z = 1
-                # self.jointw.publish(CommandDuration(data=steering_angle, duration=0.02))
             else:
                 angle = steering_angle
                 if angle != 0:
                     R = 0.213/math.tan(angle)
                     twist.angular.z = twist.linear.x/R
-            # print(twist)
-        self.mecanum_pub.publish(twist)
+
+        move_active = (abs(axes['lx']) > 0.0 or abs(axes['ly']) > 0.0 or abs(axes['rx']) > 0.0)
+        if move_active:
+            self._publish_twist(twist)
+        else:
+            self._release()
 
     def select_callback(self, new_state):
         pass
@@ -141,12 +178,20 @@ class JoystickController(Node):
         buttons = list(joy_msg.buttons)
         buttons.extend([hat_xl, hat_xr, hat_yu, hat_yd, 0])
         buttons = dict(zip(BUTTON_MAP, buttons))
+        # React to deadman transitions even when the stick value is unchanged.
+        held_now = self._deadman_held(list(joy_msg.buttons))
+        held_prev = getattr(self, '_deadman_prev', False)
+        if held_now and not held_prev:
+            self.axes_callback(axes, True)
+        elif held_prev and not held_now and self._publishing:
+            self._release()
+        self._deadman_prev = held_now
         for key, value in axes.items(): # 轴的值被改变
             if self.last_axes[key] != value:
                 axes_changed = True
         if axes_changed:
             try:
-                self.axes_callback(axes)
+                self.axes_callback(axes, self._deadman_held(buttons))
             except Exception as e:
                 self.get_logger().error(str(e))
         for key, value in buttons.items():

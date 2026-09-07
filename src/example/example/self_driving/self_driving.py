@@ -347,6 +347,10 @@ class SelfDrivingNode(Node):
                                 twist.angular.z = 0.15*math.tan(-0.6)/0.213  # 转弯速度
                     self.mecanum_pub.publish(twist)
                 else:
+                    # Lane lost: revoke motion instead of only clearing the PID.
+                    twist.linear.x = 0.0
+                    twist.angular.z = 0.0
+                    self.mecanum_pub.publish(twist)
                     self.pid.clear()
 
                 # 绘制识别的物体，由于物体检测的速度小于线检测的速度，所以绘制的框会有所偏离

@@ -185,9 +185,11 @@ class LineFollowingNode(Node):
         self.get_logger().info('\033[1;32m%s\033[0m' % "line following exit")
         try:
             if self.image_sub is not None:
-                self.image_sub.unregister()
+                self.destroy_subscription(self.image_sub)
+                self.image_sub = None
             if self.lidar_sub is not None:
-                self.lidar_sub.unregister()
+                self.destroy_subscription(self.lidar_sub)
+                self.lidar_sub = None
         except Exception as e:
             self.get_logger().error(str(e))
         with self.lock:
@@ -310,9 +312,15 @@ class LineFollowingNode(Node):
                         elif self.stop:
                             self.mecanum_pub.publish(Twist())
                         else:
+                            # Target line lost: revoke motion instead of silently
+                            # keeping the last command alive.
+                            if self.is_running:
+                                self.mecanum_pub.publish(Twist())
                             self.pid.clear()
                     except Exception as e:
                         self.get_logger().error(str(e))
+                        if self.is_running:
+                            self.mecanum_pub.publish(Twist())
         if self.debug:
             if self.image_queue.full():
                 # 如果队列已满，丢弃最旧的图像

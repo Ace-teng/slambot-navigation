@@ -71,7 +71,8 @@ class LidarController(Node):
         self.pid_dist.clear()
         try:
             if self.lidar_sub is not None:
-                self.lidar_sub.unregister()
+                self.destroy_subscription(self.lidar_sub)
+                self.lidar_sub = None
         except Exception as e:
             self.get_logger().error(str(e))
 
@@ -103,9 +104,11 @@ class LidarController(Node):
         if not 0 <= new_running_mode <= 3:
             response.success = False
             response.message = "Invalid running mode {}".format(new_running_mode)
-        else:
-            with self.lock:
-                self.running_mode = new_running_mode
+            return response
+        with self.lock:
+            self.running_mode = new_running_mode
+        response.success = True
+        response.message = "set_running ok"
         self.mecanum_pub.publish(Twist())
         return response
 
@@ -116,6 +119,10 @@ class LidarController(Node):
         :return:
         '''
         new_parameters = request.data
+        if len(new_parameters) != 3:
+            response.success = False
+            response.message = "Expected 3 parameters (threshold, scan_angle, speed)"
+            return response
         new_threshold, new_scan_angle, new_speed = new_parameters
         self.get_logger().info("\033[1;32mn_t:{:2f}, n_a:{:2f}, n_s:{:2f}\033[0m".format(new_threshold, new_scan_angle, new_speed))
         if not 0.3 <= new_threshold <= 1.5:
@@ -124,18 +131,19 @@ class LidarController(Node):
             return response
         if not 0 <= new_scan_angle <= 90:
             response.success = False
-            response.message = "New scan angle ({:.2f}) is out of range (0 ~ 90)"
+            response.message = "New scan angle ({:.2f}) is out of range (0 ~ 90)".format(new_scan_angle)
             return response
-        if not new_speed > 0:
+        if not 0 < new_speed <= 0.5:
             response.success = False
-            response.message = "Invalid speed"
+            response.message = "New speed ({:.2f}) is out of range (0 ~ 0.5)".format(new_speed)
             return response
 
         with self.lock:
             self.threshold = new_threshold
             self.scan_angle = math.radians(new_scan_angle)
             self.speed = new_speed
-            self.speed = self.speed
+        response.success = True
+        response.message = "set_parameters ok"
         return response
 
     def lidar_callback(self, lidar_data):
@@ -317,8 +325,11 @@ class LidarController(Node):
                         dist = dist_.min()
                         min_index = list(ranges).index(dist)
                         angle = -angle + lidar_data.angle_increment * min_index  # 计算最小值对应的角度(calculate the angle corresponding to the minimum value)
+                        if not hasattr(self, '_pandas'):
+                            import pandas
+                            self._pandas = pandas
                         self.angle_data.append(angle)
-                        data = pd.DataFrame(self.angle_data)
+                        data = self._pandas.DataFrame(self.angle_data)
                         data_ = data.copy()
                         u = data_.mean()  # 计算均值
                         std = data_.std()  # 计算标准差

@@ -26,6 +26,8 @@ def generate_launch_description():
 
     if lidar_type == 'LD19':
         lidar_launch_path = os.path.join(peripherals_package_path, 'launch/include/ldlidar_LD19.launch.py')
+    elif lidar_type == 'LD14P':
+        lidar_launch_path = os.path.join(peripherals_package_path, 'launch/include/ldlidar_LD14P.launch.py')
     elif lidar_type == 'A1':
         lidar_launch_path = os.path.join(peripherals_package_path, 'launch/include/sllidar_a1.launch.py')
     elif lidar_type == 'G4':

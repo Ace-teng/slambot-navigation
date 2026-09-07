@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*.*'))),
+        (os.path.join('share', package_name, 'launch/include'), glob(os.path.join('launch/include', '*.*'))),
         (os.path.join('share', package_name, 'config'), glob(os.path.join('config', '*.*'))),
         (os.path.join('share', package_name, 'rviz'), glob(os.path.join('rviz', '*.*'))),
         (os.path.join('share', package_name, 'behavior_trees'), glob(os.path.join('behavior_trees', '*.xml'))),

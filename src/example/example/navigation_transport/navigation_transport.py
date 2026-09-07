@@ -183,6 +183,7 @@ class NavigationTransport(Node):
             self.place = False
             self.get_logger().info('\033[1;32m%s\033[0m' % 'nav pick')
 
+            self.goal_pose = msg
             self.navigator.goToPose(msg)
             self.haved_publish_goal = True
         elif status == 'pick_finish':  # 处于可以place的状态
@@ -190,6 +191,7 @@ class NavigationTransport(Node):
             self.place = True
             self.get_logger().info('\033[1;32m%s\033[0m' % 'nav place')
 
+            self.goal_pose = msg
             self.navigator.goToPose(msg)
             self.haved_publish_goal = True
 

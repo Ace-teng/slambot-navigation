@@ -58,7 +58,7 @@ class PreventFallingNode(Node):
 
     def get_node_state(self, request, response):
         response.success = True
-        return responsee
+        return response
 
     def depth_callback(self, ros_depth_image):
         depth_image = np.ndarray(shape=(ros_depth_image.height, ros_depth_image.width), dtype=np.uint16, buffer=ros_depth_image.data)
@@ -108,8 +108,10 @@ class PreventFallingNode(Node):
             except queue.Empty:
                 if not self.running:
                     break
-                else:
-                    continue
+                # Depth stream stalled: revoke any motion started before the stall.
+                self.mecanum_pub.publish(Twist())
+                self.turn = False
+                continue
             depth_color_map = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.45), cv2.COLORMAP_JET)
             cv2.circle(depth_color_map, (int((self.left_roi[2] + self.left_roi[3]) / 2), int((self.left_roi[0] + self.left_roi[1]) / 2)), 10, (0, 0, 0), -1)
             cv2.circle(depth_color_map, (int((self.center_roi[2] + self.center_roi[3]) / 2), int((self.center_roi[0] + self.center_roi[1]) / 2)), 10, (0, 0, 0), -1)

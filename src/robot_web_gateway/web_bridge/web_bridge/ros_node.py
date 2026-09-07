@@ -53,8 +53,14 @@ class GatewayNode(Node):
         self.create_subscription(LaserScan, self.config.scan_topic, self._scan_callback, scan_qos)
         self.create_subscription(Odometry, self.config.odom_topic, self._odom_callback, scan_qos)
         self.create_subscription(TFMessage, self.config.tf_topic, self._tf_callback, 100)
-        self.create_subscription(TFMessage, self.config.tf_static_topic, self._tf_static_callback, 100)
+        static_qos = QoSProfile(
+            depth=100,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(TFMessage, self.config.tf_static_topic, self._tf_static_callback, static_qos)
         self.create_timer(1.0 / self.config.pose_rate_hz, self._pose_timer)
+        self._last_tf_error = None
 
     def _scan_callback(self, message):
         try:
@@ -92,8 +98,14 @@ class GatewayNode(Node):
             source_stamp = int(stamp.sec) * 1000000000 + int(stamp.nanosec)
             payload = serialize_pose(transform, self.config.map_frame, self.config.base_frame, source_stamp)
             self.state.set_data("pose", payload, source_stamp, self.config.map_frame)
+            self._last_tf_error = None
         except Exception as exc:  # tf2 raises several exception subclasses across Humble patches
-            self.state.add_error("tf: " + str(exc))
+            # Deduplicate identical consecutive errors so a frozen TF does not
+            # grow the error buffer at 10 Hz forever.
+            message = str(exc)
+            if message != self._last_tf_error:
+                self.state.add_error("tf: " + message)
+                self._last_tf_error = message
 
     def close(self):
         self.map_worker.close()

@@ -1,3 +1,6 @@
-# Ignore ModemManager for ttyACM0 device
-KERNEL=="ttyACM*", SUBSYSTEM=="tty", GROUP="users", MODE="0777", SYMLINK+="rrc"
-ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ENV{ID_MM_PORT_IGNORE}="1"1"
+# Robot controller board (CH341 / 1a86:55d4) serial device.
+# Match by vendor/product so unrelated ttyACM* devices are never mapped to rrc.
+# MODE 0660 + dialout: operator group gets device access, world does not.
+KERNEL=="ttyACM*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", GROUP="dialout", MODE="0660", SYMLINK+="rrc"
+# Ignore ModemManager for the robot controller port.
+ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ENV{ID_MM_PORT_IGNORE}="1"

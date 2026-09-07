@@ -50,39 +50,50 @@ class CalibrateLinear(Node):
 
     def main(self):
         while True:
-            self.update_param()
-            move_cmd = Twist()
-            if self.start_test:
-                # Get the current position from the tf transform between the odom and base frames
-                self.position = self.get_position()
+            try:
+                self.update_param()
+                move_cmd = Twist()
+                if self.start_test:
+                    # Get the current position from the tf transform between the odom and base frames
+                    self.position = self.get_position()
+                    if self.position is None:
+                        # No TF feedback: stop and retry instead of crashing the
+                        # thread before the next stop command is sent.
+                        self.cmd_vel.publish(Twist())
+                        time.sleep(0.05)
+                        continue
 
-                # Compute the Euclidean distance from the target point
-                original_distance = sqrt(pow((self.position.transform.translation.x - self.x_start), 2) +
-                                pow((self.position.transform.translation.y - self.y_start), 2))
+                    # Compute the Euclidean distance from the target point
+                    original_distance = sqrt(pow((self.position.transform.translation.x - self.x_start), 2) +
+                                    pow((self.position.transform.translation.y - self.y_start), 2))
 
-                # Correct the estimated distance by the correction factor
-                calib_distance = original_distance * self.odom_linear_scale_correction
+                    # Correct the estimated distance by the correction factor
+                    calib_distance = original_distance * self.odom_linear_scale_correction
 
-                # How close are we?
-                error = calib_distance - self.test_distance
-                # self.get_logger().info('\033[1;32moriginal:%f calib:%f\033[0m' % (original_distance, calib_distance))
-                # Are we close enough?
-                if not self.start_test or abs(error) <  self.tolerance:
-                    self.start_test = rclpy.parameter.Parameter('start_test', rclpy.Parameter.Type.BOOL, False)
-                    all_new_parameters = [self.start_test]
-                    self.set_parameters(all_new_parameters)
-                    self.get_logger().info('\033[1;32m%s\033[0m' % 'finish')
+                    # How close are we?
+                    error = calib_distance - self.test_distance
+                    # self.get_logger().info('\033[1;32moriginal:%f calib:%f\033[0m' % (original_distance, calib_distance))
+                    # Are we close enough?
+                    if abs(error) < self.tolerance:
+                        self.start_test = rclpy.parameter.Parameter('start_test', rclpy.Parameter.Type.BOOL, False)
+                        all_new_parameters = [self.start_test]
+                        self.set_parameters(all_new_parameters)
+                        self.get_logger().info('\033[1;32m%s\033[0m' % 'finish')
+                    else:
+                        # If not, move in the appropriate direction
+                        move_cmd.linear.x = copysign(self.speed, -1 * error)
                 else:
-                    # If not, move in the appropriate direction
-                    move_cmd.linear.x = copysign(self.speed, -1 * error)
-            else:
-                self.position = self.get_position()
-                if self.position is not None:
-                    self.x_start = self.position.transform.translation.x
-                    self.y_start = self.position.transform.translation.y
+                    self.position = self.get_position()
+                    if self.position is not None:
+                        self.x_start = self.position.transform.translation.x
+                        self.y_start = self.position.transform.translation.y
 
-            self.cmd_vel.publish(move_cmd)
-            time.sleep(0.05)
+                self.cmd_vel.publish(move_cmd)
+                time.sleep(0.05)
+            except Exception as exc:
+                self.get_logger().error('calibrate_linear main error: %s' % str(exc))
+                self.cmd_vel.publish(Twist())
+                time.sleep(0.05)
 
     def get_position(self):
         # Get the current transform between the odom and base frames

@@ -7,7 +7,7 @@
 #define RECORD_DEVICE_NAME   "hw:CARD=XFMDPV0018,DEV=0"
 
 /******麦克风基础功能参数******/
-bool save_pcm_local = true;   //保存音频到本地.
+bool save_pcm_local = false;   //保存音频到本地. 默认关闭，避免未经提示地写入用户语音
 int max_pcm_size = 10240000;  //最大为10M,超过10M后自动删除,以节省空间.
 int buffer_frames = 512;
 

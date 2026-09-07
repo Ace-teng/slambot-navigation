@@ -39,7 +39,14 @@ class ColorDetectNode(Node):
         self.bridge = CvBridge()
 
         line_roi = self.get_parameters_by_prefix('roi_line')
-        self.line_roi = {'roi_up': line_roi['roi_up'], 'roi_center': line_roi['roi_center'], 'roi_down': line_roi['roi_down']}
+        # YAML values are lists; unpack with .value and append each row's scale so
+        # roi_value[-1] (used for the centroid weight) works like the service setter.
+        line_scales = line_roi['scale'].value
+        self.line_roi = {
+            'roi_up': list(line_roi['roi_up'].value) + [line_scales[0]],
+            'roi_center': list(line_roi['roi_center'].value) + [line_scales[1]],
+            'roi_down': list(line_roi['roi_down'].value) + [line_scales[2]],
+        }
         circle_roi = self.get_parameters_by_prefix('roi_circle')
         self.circle_roi = {'x_min': circle_roi['x_min'].value, 'x_max': circle_roi['x_max'].value, 'y_min': circle_roi['y_min'].value, 'y_max': circle_roi['y_max'].value}
         rect_roi = self.get_parameters_by_prefix('roi_rect')

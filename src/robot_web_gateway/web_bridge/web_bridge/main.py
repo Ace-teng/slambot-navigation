@@ -23,11 +23,15 @@ def run_server(state, host, port, ready=None, stopped=None):
     async def stop():
         if runner:
             await runner.cleanup()
-        if stopped:
-            stopped.set()
+
+    def watch_stop():
+        if stopped is not None:
+            stopped.wait()
+            loop.call_soon_threadsafe(loop.stop)
 
     try:
         loop.run_until_complete(start())
+        threading.Thread(target=watch_stop, daemon=True).start()
         loop.run_forever()
     finally:
         loop.run_until_complete(stop())
@@ -41,10 +45,12 @@ def main(args=None):
 
     rclpy.init(args=args)
     node = GatewayNode()
-    host = node.declare_parameter("http_host", "127.0.0.1").value
-    port = node.declare_parameter("http_port", 8080).value
+    host = node.get_parameter("http_host").value
+    port = node.get_parameter("http_port").value
     ready = threading.Event()
-    thread = threading.Thread(target=run_server, args=(node.state, host, port, ready), daemon=True)
+    stopped = threading.Event()
+    thread = threading.Thread(
+        target=run_server, args=(node.state, host, port, ready, stopped), daemon=True)
     thread.start()
     try:
         if not ready.wait(5):
@@ -53,6 +59,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        stopped.set()
+        thread.join(timeout=5)
         node.close()
         rclpy.shutdown()
 

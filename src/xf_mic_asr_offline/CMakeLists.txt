@@ -15,6 +15,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(xf_mic_asr_offline_msgs REQUIRED)
 find_package(ros_robot_controller_msgs REQUIRED)
 
@@ -22,20 +23,24 @@ include_directories(
   include
 )
 
-link_directories(
-  lib/arm64
-)
+# The vendor offline_record_lib / lib/arm64 tree is delivered separately by the
+# hardware vendor and is not committed to this repository. Link against it only
+# when it is present so that a clean `colcon build` does not fail on its absence.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib")
+  link_directories(
+    lib/arm64
+  )
+  set(OFFLINE_RECORD_LIBS offline_record_lib)
+else()
+  set(OFFLINE_RECORD_LIBS)
+endif()
 
 # Create the executable target
 add_executable(voice_control src/voice_control.cpp)
 ament_target_dependencies(voice_control rclcpp std_msgs xf_mic_asr_offline_msgs ros_robot_controller_msgs)
-target_link_libraries(voice_control ${catkin_LIBRARIES} offline_record_lib rt dl pthread stdc++ asound)
+target_link_libraries(voice_control ${OFFLINE_RECORD_LIBS} rt dl pthread stdc++ asound)
 install(TARGETS voice_control
   RUNTIME DESTINATION lib/${PROJECT_NAME}
-)
-# Build the target
-install(TARGETS voice_control
-  DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install Python modules
@@ -55,8 +60,14 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch config feedback_voice
-  DESTINATION share/${PROJECT_NAME})
+# `feedback_voice` is also a vendor asset and may be absent; install it if present.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/feedback_voice")
+  install(DIRECTORY launch config feedback_voice
+    DESTINATION share/${PROJECT_NAME})
+else()
+  install(DIRECTORY launch config
+    DESTINATION share/${PROJECT_NAME})
+endif()
 
 # Add the test directories if needed
 if(BUILD_TESTING)

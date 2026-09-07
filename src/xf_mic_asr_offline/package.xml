@@ -12,6 +12,7 @@
 
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
+  <depend>std_msgs</depend>
   <depend>xf_mic_asr_offline_msgs</depend>
   <depend>ros_robot_controller_msgs</depend>
 

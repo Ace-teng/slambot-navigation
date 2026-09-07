@@ -1,23 +1,38 @@
 import os
 from glob import glob
-from setuptools import setup
+from setuptools import find_namespace_packages, setup
 
 package_name = 'example'
+
+
+def _nested_launch_files():
+    # Launch files live next to their code (example/color_detect/*.launch.py) and
+    # include each other through ``share/example/example/...`` paths. Replicate the
+    # source tree under ``share/<package>/<source subpath>`` so non-symlink
+    # installs resolve the same paths as the source layout.
+    entries = []
+    for dirpath, _, filenames in os.walk(package_name):
+        files = [os.path.join(dirpath, f) for f in filenames if f.endswith('.launch.py')]
+        if not files:
+            continue
+        entries.append((os.path.join('share', package_name, dirpath), files))
+    return entries
+
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name],
+    packages=find_namespace_packages(include=['example*']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob(os.path.join('example', '**/*.launch.py'))),
+        * _nested_launch_files(),
         (os.path.join('share', package_name, 'config'), glob(os.path.join('config', '*.yaml'))),
         (os.path.join('share', package_name, 'resource'), glob(os.path.join('resource', '*.dae'))),
     ],
     install_requires=['setuptools'],
-    zip_safe=True,
+    zip_safe=False,
     maintainer='ubuntu',
     maintainer_email='1270161395@qq.com',
     description='TODO: Package description',
