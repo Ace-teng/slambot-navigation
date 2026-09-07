@@ -7,6 +7,19 @@
   <maintainer email="1270161395@qq.com">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>laser_filters</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>ros_robot_controller_msgs</exec_depend>
+  <exec_depend>ros_robot_controller</exec_depend>
+  <exec_depend>controller</exec_depend>
+  <exec_depend>jetrover_description</exec_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

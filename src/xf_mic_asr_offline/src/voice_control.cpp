@@ -1,5 +1,13 @@
 #include "voice_control.h"
 
+#include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <thread>
+#include <vector>
+
 /************************************************
 Function: Example Initialize recording parameters
 功能: 初始化录音参数
@@ -106,31 +114,40 @@ Function: Initialize offline resource parameters
 功能: 初始化离线资源参数
 ************************************************/
 int SpeechProcess::init_asr_params(){
-	char pp_[600],pp1_[600],pp2_[600];
 	init_rec = 0;
 	init_success = 0;
 	write_first_data = 0;
-	package_path = const_cast<char *>(source_path.c_str());
 
-	strcpy(pp_, begin_);
-	char *begin_head   = strcat(pp_, package_path);
-	char *jet_path 	   = strcat(begin_head, ASR_RES_PATH);
+	// Build every path with std::string; never write through a const_cast'd
+	// c_str(). The vendor ASR API takes writable char*: hand it owned copies.
+	std::string root(source_path);
+	std::string jet_path   = std::string(begin_) + root + ASR_RES_PATH;
+	std::string gram_path  = root + GRM_BUILD_PATH;
+	std::string bnf_path   = root + GRM_FILE;
+	std::string denoise    = root + DENOISE_SOUND_PATH;
 
-	strcpy(pp1_, package_path);
-	char *grammer_path = strcat(pp1_, GRM_BUILD_PATH);
+	std::vector<char> jet_buf(jet_path.begin(), jet_path.end());
+	jet_buf.push_back('\0');
+	std::vector<char> gram_buf(gram_path.begin(), gram_path.end());
+	gram_buf.push_back('\0');
+	std::vector<char> bnf_buf(bnf_path.begin(), bnf_path.end());
+	bnf_buf.push_back('\0');
 
-	strcpy(pp2_, package_path);
-	char *bnf_path 	   = strcat(pp2_, GRM_FILE);
-
-	denoise_sound_path = strcat(package_path, DENOISE_SOUND_PATH);
-	cout <<">>>>>denoise_sound_path :" << denoise_sound_path <<endl;
+	// denoise_sound_path is a module-level char* used later by get_record_sound().
+	if (denoise_sound_path != NULL) {
+		delete[] denoise_sound_path;
+	}
+	denoise_sound_path = new char[denoise.size() + 1];
+	std::copy(denoise.begin(), denoise.end(), denoise_sound_path);
+	denoise_sound_path[denoise.size()] = '\0';
+	std::cout <<">>>>>denoise_sound_path :" << denoise_sound_path <<std::endl;
 
 	APPID = const_cast<char *>(appid.c_str());
 
-	Recognise_Result inital = initial_asr_paramers(jet_path, grammer_path, bnf_path, LEX_NAME);
+	Recognise_Result inital = initial_asr_paramers(jet_buf.data(), gram_buf.data(), bnf_buf.data(), LEX_NAME);
 	if (!inital.whether_recognised)
 	{
-		cout <<"fail_reason :" << inital.fail_reason << endl;
+		std::cout <<"fail_reason :" << inital.fail_reason << std::endl;
 		return -1;
 	}
 	return 0;
@@ -194,35 +211,30 @@ void SpeechProcess::business_data_t(unsigned char* record)
     {
         // int len = 3*PCM_MSG_LEN;
         int len = PCM_MSG_LEN;
-        char *pcm_buffer=new char[len];
-        if (NULL == pcm_buffer)
+        std::unique_ptr<char[]> pcm_buffer(new char[len]);
+        if (!pcm_buffer)
             {
-            	cout <<">>>>>buffer is null" <<endl;
+            	std::cout <<">>>>>buffer is null" <<std::endl;
+                return;
             }
-        memcpy(pcm_buffer, record_data, len);
+        std::memcpy(pcm_buffer.get(), record_data, len);
 
         if (write_first_data++ == 0)
         {
 #if whether_print_log
-        	cout <<"***************write the first voice**********" <<endl;
+        	std::cout <<"***************write the first voice**********" <<std::endl;
 #endif
-            demo_xf_mic(pcm_buffer, len, 1);
+            demo_xf_mic(pcm_buffer.get(), len, 1);
         }
-
         else
         {
 #if whether_print_log
-        	cout <<"***************write the middle voice**********" <<endl;
+        	std::cout <<"***************write the middle voice**********" <<std::endl;
 #endif
-            demo_xf_mic(pcm_buffer, len, 2);
+            demo_xf_mic(pcm_buffer.get(), len, 2);
         }
         if (whether_finised)
         {
-        	if (pcm_buffer != NULL)
-        	{
-        		delete[] pcm_buffer;
-        		pcm_buffer = NULL;
-        	}
             record_finish = 1;
             whether_finised = 0;
         }
@@ -271,12 +283,20 @@ void SpeechProcess::get_record_sound(const char *fname)
             init_rec = 1;
             if (save_pcm_local)
             {
-                if (-1 != filesize(filename))
+                // Rotate the PCM log safely: close the handle before removing the
+                // file, otherwise writes continue into a deleted inode.
+                if (filesize(filename) > max_pcm_size)
                 {
-                    int file_size = filesize(filename);
-                    if (file_size > max_pcm_size) remove(filename);
+                    fclose(pcm_file);
+                    remove(filename);
+                    pcm_file = fopen(filename, "a");
+                    if (pcm_file == NULL)
+                    {
+                        cout << "无法重新创建音频文件" <<endl;
+                        exit(1);
+                    }
                 }
-               fwrite(record.buffer,record.chunk_size*params.channel,record.bits_per_sample,pcm_file);
+                fwrite(record.buffer, record.chunk_size * params.channel, record.bits_per_sample, pcm_file);
             }
             business_data_t(record.buffer);
         }
@@ -306,48 +326,48 @@ Function: Recognition text processing
 Effective_Result SpeechProcess::show_result(char *str)
 {
 	Effective_Result current;
-	if (strlen(str) > 250)
+	current.effective_confidence = 0;
+	current.effective_word[0] = '\0';
+	if (str == NULL || strlen(str) <= 250)
 	{
-		char asr_result[32];	//识别到的关键字的结果
-		char asr_confidence[3]; //识别到的关键字的置信度
-		char *p1 = strstr(str, "<focus>");
-		char *p2 = strstr(str, "</focus>");
-		int n1 = p1 - str + 1;
-		int n2 = p2 - str + 1;
-
-		char *p3 = strstr(str, "<confidence>");
-		char *p4 = strstr(str, "</confidence>");
-		int n3 = p3 - str + 1;
-		int n4 = p4 - str + 1;
-		for (int i = 0; i < 32; i++)
-		{
-			asr_result[i] = '\0';
-		}
-
-		strncpy(asr_confidence, str + n3 + strlen("<confidence>") - 1, n4 - n3 - strlen("<confidence>"));
-		asr_confidence[n4 - n3 -strlen("<confidence>")] = '\0';
-		int confidence_int = 0;
-		confidence_int = atoi(asr_confidence);
-		if (confidence_int >= confidence)
-		{
-			strncpy(asr_result, str + n1 + strlen("<focus>") - 1, n2 - n1 - strlen("<focus>"));
-			asr_result[n2 - n1 - strlen("<focus>")] = '\0';
-		}
-		else
-		{
-			strncpy(asr_result, "", 1);
-		}
-		current.effective_confidence = confidence_int;
-        std::replace(std::begin(asr_result), std::end(asr_result), str_, str_none);
-		strcpy(current.effective_word,asr_result);
+		std::strncpy(current.effective_word, " ", sizeof(current.effective_word) - 1);
+		current.effective_word[sizeof(current.effective_word) - 1] = '\0';
 		return current;
 	}
-    else
-    {
-		current.effective_confidence = 0;
-		strcpy(current.effective_word," ");
-		return current;
+
+	// Parse <focus>...</focus> and <confidence>...</confidence> markers with
+	// bounds checks instead of the previous unbounded fixed-size strncpy.
+	std::string text(str);
+	const std::string focus_start = "<focus>";
+	const std::string focus_end = "</focus>";
+	const std::string conf_start = "<confidence>";
+	const std::string conf_end = "</confidence>";
+
+	std::string word;
+	int confidence_int = 0;
+	std::size_t fs = text.find(focus_start);
+	std::size_t fe = text.find(focus_end, fs == std::string::npos ? 0 : fs);
+	std::size_t cs = text.find(conf_start);
+	std::size_t ce = text.find(conf_end, cs == std::string::npos ? 0 : cs);
+
+	if (fs != std::string::npos && fe != std::string::npos && fe > fs + focus_start.size())
+	{
+		word = text.substr(fs + focus_start.size(), fe - (fs + focus_start.size()));
 	}
+	if (cs != std::string::npos && ce != std::string::npos && ce > cs + conf_start.size())
+	{
+		std::string conf_text = text.substr(cs + conf_start.size(), ce - (cs + conf_start.size()));
+		confidence_int = std::atoi(conf_text.c_str());
+	}
+
+	current.effective_confidence = confidence_int;
+	if (confidence_int >= confidence)
+	{
+		std::replace(word.begin(), word.end(), str_, str_none);
+		std::strncpy(current.effective_word, word.c_str(), sizeof(current.effective_word) - 1);
+		current.effective_word[sizeof(current.effective_word) - 1] = '\0';
+	}
+	return current;
 }
 
 /********************************************************
@@ -440,8 +460,7 @@ SpeechProcess::SpeechProcess(const std::string &node_name)
 		RCLCPP_INFO(this->get_logger(),"Initialization Offline resource parameter success!");
 	}
 
-	auto cal_task = std::make_shared<std::thread>(std::bind(&SpeechProcess::run,this));
-	cal_task->detach();
+	cal_task_ = std::thread(&SpeechProcess::run, this);
 }
 
 /********************************************************
@@ -457,14 +476,14 @@ void SpeechProcess::run()
             while(init_rec && whether_finised != 1){
 				last_time = rclcpp::Node::now();
 				if ((last_time - start_time).seconds() > time_per_order){
-					cout <<">>>>>超出离线命令词最长识别时间" << endl;
+					std::cout <<">>>>>超出离线命令词最长识别时间" << std::endl;
 					whether_finised = 1;
 					break;
 				}
 			}
 		}
         else {
-            sleep(0.01);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 	}
 }
@@ -472,6 +491,10 @@ void SpeechProcess::run()
 SpeechProcess::~SpeechProcess()
 {
 	record_finish = 1;
+	if (cal_task_.joinable())
+	{
+		cal_task_.join();
+	}
 	RCLCPP_INFO(this->get_logger(),"voice_control node over!\n");
 }
 

@@ -90,44 +90,47 @@ def launch_setup(context):
                 package='nav2_controller',
                 plugin='nav2_controller::ControllerServer',
                 name='controller_server',
-                parameters=[controller_param],
+                # params_file carries the local_costmap section (nav2_params.yaml);
+                # controller_param only the DWB/TEB controller tuning.
+                parameters=[controller_param, params_file],
                 remappings=remappings + [('cmd_vel', 'cmd_vel_nav')]),
             ComposableNode(
                 package='nav2_smoother',
                 plugin='nav2_smoother::SmootherServer',
                 name='smoother_server',
-                parameters=[params_file],
+                parameters=[params_file, {'use_sim_time': use_sim_time}],
                 remappings=remappings),
             ComposableNode(
                 package='nav2_planner',
                 plugin='nav2_planner::PlannerServer',
                 name='planner_server',
-                parameters=[params_file],
+                parameters=[params_file, {'use_sim_time': use_sim_time}],
                 remappings=remappings),
             ComposableNode(
                 package='nav2_behaviors',
                 plugin='behavior_server::BehaviorServer',
                 name='behavior_server',
-                parameters=[params_file],
+                parameters=[params_file, {'use_sim_time': use_sim_time}],
                 remappings=remappings),
             ComposableNode(
                 package='nav2_bt_navigator',
                 plugin='nav2_bt_navigator::BtNavigator',
                 name='bt_navigator',
                 parameters=[params_file,
-                            {'default_nav_to_pose_bt_xml': default_bt_xml}],
+                            {'use_sim_time': use_sim_time,
+                             'default_nav_to_pose_bt_xml': default_bt_xml}],
                 remappings=remappings),
             ComposableNode(
                 package='nav2_waypoint_follower',
                 plugin='nav2_waypoint_follower::WaypointFollower',
                 name='waypoint_follower',
-                parameters=[params_file],
+                parameters=[params_file, {'use_sim_time': use_sim_time}],
                 remappings=remappings),
             ComposableNode(
                 package='nav2_velocity_smoother',
                 plugin='nav2_velocity_smoother::VelocitySmoother',
                 name='velocity_smoother',
-                parameters=[params_file],
+                parameters=[params_file, {'use_sim_time': use_sim_time}],
                 remappings=remappings +
                            [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', 'cmd_vel')]),
             ComposableNode(

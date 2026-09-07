@@ -1,3 +1,6 @@
-# Ignore ModemManager for ttyACM0 device
-KERNEL=="ttyACM0", SUBSYSTEM=="tty", GROUP="ubuntu", MODE="0777"
+# Robot controller board (CH341 / 1a86:55d4) serial device.
+# MODE 0660 + dialout: the member group gets access, world does not. Do not
+# assume a fixed "ubuntu" user; add the runtime user to the dialout group.
+KERNEL=="ttyACM0", SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", GROUP="dialout", MODE="0660"
+# Ignore ModemManager for the robot controller port.
 ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ENV{ID_MM_PORT_IGNORE}="1"

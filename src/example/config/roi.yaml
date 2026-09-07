@@ -1,17 +1,18 @@
-/**:
+/**: 
   ros__parameters:
+    # Rows are kept inside the 360-row camera output (see dabai_dcw color_height).
     roi_line:
-      roi_up: [330, 360, 0, 640]
-      roi_center: [390, 420, 0, 640]
-      roi_down: [450, 480, 0, 640]
+      roi_up: [240, 300, 0, 640]
+      roi_center: [300, 330, 0, 640]
+      roi_down: [330, 360, 0, 640]
       scale: [0.1, 0.2, 0.7]
     roi_circle:
       x_min: 0
       x_max: 640
       y_min: 0
-      y_max: 480
+      y_max: 360
     roi_rect:
       x_min: 0
       x_max: 640
       y_min: 0
-      y_max: 480
+      y_max: 360

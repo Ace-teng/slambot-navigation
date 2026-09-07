@@ -3,7 +3,7 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription, LaunchService
 from launch.substitutions import LaunchConfiguration
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, OpaqueFunction
 
@@ -11,13 +11,19 @@ def launch_setup(context):
     compiled = os.environ['need_compile']
     sim = LaunchConfiguration('sim', default='true').perform(context)
     use_joy = LaunchConfiguration('use_joy', default='true').perform(context)
-    use_depth_camera = LaunchConfiguration('use_depth_camera', default='false')
+    use_depth_camera = LaunchConfiguration('use_depth_camera', default='false').perform(context)
     master_name = LaunchConfiguration('master_name', default='/').perform(context)
     robot_name = LaunchConfiguration('robot_name', default='/').perform(context)
     depth_camera_name = LaunchConfiguration('depth_camera_name', default='depth_cam').perform(context)
     action_name = LaunchConfiguration('action_name', default='init').perform(context)
 
+    # sim is NOT a hardware-isolation switch by itself. use_real_hw is the
+    # explicit control: when it is false none of the real driver / controller /
+    # arm-initialisation actions are launched, so sim mode cannot touch the board.
+    use_real_hw = 'false' if sim == 'true' else 'true'
+
     sim_arg = DeclareLaunchArgument('sim', default_value=sim)
+    use_real_hw_arg = DeclareLaunchArgument('use_real_hw', default_value=use_real_hw)
     master_name_arg = DeclareLaunchArgument('master_name', default_value=master_name)
     robot_name_arg = DeclareLaunchArgument('robot_name', default_value=robot_name)
     depth_camera_name_arg = DeclareLaunchArgument('depth_camera_name', default_value=depth_camera_name)
@@ -32,7 +38,7 @@ def launch_setup(context):
 
     topic_prefix = '' if robot_name == '/' else '/%s'%robot_name
     frame_prefix = '' if robot_name == '/' else '%s/'%robot_name
-    use_namespace = 'false' if robot_name == '/' else 'true'    
+    use_namespace = 'false' if robot_name == '/' else 'true'
     namespace = '' if robot_name == '/' else robot_name
     use_sim_time = 'true' if sim == 'true' else 'false'
 
@@ -64,7 +70,8 @@ def launch_setup(context):
             'map_frame': map_frame,
             'imu_frame': imu_frame,
             'use_sim_time': use_sim_time,
-        }.items()
+        }.items(),
+        condition=IfCondition(use_real_hw),
     )
 
     depth_camera_launch = IncludeLaunchDescription(
@@ -74,8 +81,13 @@ def launch_setup(context):
             'depth_camera_name': depth_camera_name,
             'tf_prefix': frame_prefix,
         }.items(),
+        condition=IfCondition(use_real_hw),
     )
 
+    # In simulation no lidar/controller driver is started (no gazebo model is
+    # committed in this repo); the simulation stack is limited to RViz + the
+    # description publisher provided by the rviz launch files.
+    use_lidar = 'true' if (use_real_hw == 'true' and use_depth_camera == 'false') else 'false'
     lidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(peripherals_package_path, 'launch/lidar.launch.py')),
@@ -84,38 +96,40 @@ def launch_setup(context):
             'scan_topic': scan_topic,
             'scan_raw': scan_raw,
         }.items(),
-        condition=UnlessCondition(use_depth_camera)
+        condition=IfCondition(use_lidar),
     )
 
     joystick_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(peripherals_package_path, 'launch/joystick_control.launch.py')),
         launch_arguments={
-            'max_linear': max_linear_sim if sim == 'true' else max_linear,  
+            'max_linear': max_linear_sim if sim == 'true' else max_linear,
             'max_angular': max_angular_sim if sim == 'true' else max_angular,
             'remap_cmd_vel': cmd_vel_topic
         }.items(),
-        condition=IfCondition(use_joy)
+        condition=IfCondition(use_joy),
     )
 
     init_pose_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(controller_package_path, 'launch/init_pose.launch.py')),
         launch_arguments={
-            'namespace': namespace,  
+            'namespace': namespace,
             'use_namespace': use_namespace,
             'action_name': action_name,
         }.items(),
+        condition=IfCondition(use_real_hw),
     )
 
-    return [sim_arg, 
+    return [sim_arg,
+            use_real_hw_arg,
             master_name_arg,
-            robot_name_arg, 
+            robot_name_arg,
             depth_camera_name_arg,
             use_joy_arg,
             use_depth_camera_arg,
             action_name_arg,
             controller_launch,
             depth_camera_launch,
-            lidar_launch, 
+            lidar_launch,
             joystick_control_launch,
             init_pose_launch,
             ]
@@ -126,7 +140,6 @@ def generate_launch_description():
     ])
 
 if __name__ == '__main__':
-    # 创建一个LaunchDescription对象
     ld = generate_launch_description()
 
     ls = LaunchService()

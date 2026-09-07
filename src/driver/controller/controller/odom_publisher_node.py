@@ -84,6 +84,12 @@ class Controller(Node):
         self.current_time = None
         signal.signal(signal.SIGINT, self.shutdown)
 
+        # Command watchdog state (monotonic wall clock, not sim time)
+        self.last_cmd_at = time.time()
+        self.cmd_lost = False
+        self.estop = False
+        self.last_stop_sent = 0.0
+
         self.ackermann = ackermann.AckermannChassis(wheelbase=0.216, track_width=0.195, wheel_diameter=0.097)
         self.mecanum = mecanum.MecanumChassis(wheelbase=0.216, track_width=0.195, wheel_diameter=0.097)
 
@@ -94,6 +100,10 @@ class Controller(Node):
         self.declare_parameter('linear_correction_factor', 1.00)
         self.declare_parameter('angular_correction_factor', 1.00)
         self.declare_parameter('machine_type', os.environ['MACHINE_TYPE'])
+        self.declare_parameter('cmd_timeout_sec', 0.3)
+        self.declare_parameter('max_linear_x', 0.2)
+        self.declare_parameter('max_linear_y', 0.2)
+        self.declare_parameter('max_angular_z', 0.5)
         
         self.pub_odom_topic = self.get_parameter('pub_odom_topic').value
         self.base_frame_id = self.get_parameter('base_frame_id').value
@@ -102,6 +112,10 @@ class Controller(Node):
         self.linear_factor = self.get_parameter('linear_correction_factor').value
         self.angular_factor = self.get_parameter('angular_correction_factor').value
         self.machine_type = self.get_parameter('machine_type').value
+        self.cmd_timeout_sec = float(self.get_parameter('cmd_timeout_sec').value)
+        self.max_linear_x = float(self.get_parameter('max_linear_x').value)
+        self.max_linear_y = float(self.get_parameter('max_linear_y').value)
+        self.max_angular_z = float(self.get_parameter('max_angular_z').value)
 
         self.clock = self.get_clock() 
         if self.pub_odom_topic:
@@ -129,6 +143,8 @@ class Controller(Node):
         self.create_subscription(Twist, 'controller/cmd_vel', self.cmd_vel_callback, 1)
         self.create_subscription(Twist, 'cmd_vel', self.app_cmd_vel_callback, 1)
         self.create_service(Trigger, 'controller/load_calibrate_param', self.load_calibrate_param)
+        self.create_service(Trigger, '~/estop', self.estop_callback)
+        self.create_service(Trigger, '~/estop_release', self.estop_release_callback)
 
         self.create_service(Trigger, '~/init_finish', self.get_node_state)
         self.get_logger().info('\033[1;32m%s\033[0m' % 'start')
@@ -139,58 +155,91 @@ class Controller(Node):
 
     def shutdown(self, signum, frame):
         self.get_logger().info('\033[1;32m%s\033[0m' % 'shutdown')
+        self.estop = True
+        self._publish_stop()
         rclpy.shutdown()
 
     def load_calibrate_param(self, request, response):
-        self.linear_factor = self.get_parameter('~linear_correction_factor').value or 1.00
-        self.angular_factor = self.get_parameter('~angular_correction_factor').value or 1.00
+        self.linear_factor = self.get_parameter('linear_correction_factor').value or 1.00
+        self.angular_factor = self.get_parameter('angular_correction_factor').value or 1.00
         self.get_logger().info('\033[1;32m%s\033[0m' % 'load_calibrate_param')
 
         response.success = True
         return response
 
+    def estop_callback(self, request, response):
+        self.get_logger().warn('\033[1;31mE-STOP engaged\033[0m')
+        self.estop = True
+        self._publish_stop()
+        response.success = True
+        return response
+
+    def estop_release_callback(self, request, response):
+        self.get_logger().warn('\033[1;32mE-STOP released\033[0m')
+        self.estop = False
+        self.cmd_lost = False
+        response.success = True
+        return response
+
+    def _stop_motor_data(self):
+        if self.machine_type == 'JetRover_Acker':
+            _, motor_data = self.ackermann.set_velocity(0.0, 0.0)
+        else:
+            return self.mecanum.set_velocity(0.0, 0.0, 0.0)
+        msg = MotorsState()
+        msg.data = motor_data
+        return msg
+
+    def _publish_stop(self):
+        try:
+            self.motor_pub.publish(self._stop_motor_data())
+        except Exception as exc:
+            self.get_logger().error('stop publish failed: %s' % str(exc))
+        self.last_stop_sent = time.time()
+
     def set_odom(self, msg):
         self.odom = Odometry()
         self.odom.header.frame_id = self.odom_frame_id
         self.odom.child_frame_id = self.base_frame_id
-        
+
         self.odom.pose.covariance = ODOM_POSE_COVARIANCE
         self.odom.twist.covariance = ODOM_TWIST_COVARIANCE
         self.odom.pose.pose.position.x = msg.x
         self.odom.pose.pose.position.y = msg.y
+        self.x = msg.x
+        self.y = msg.y
         self.pose_yaw = msg.theta
+        self.last_time = time.time()
         self.odom.pose.pose.orientation = rpy2qua(0, 0, self.pose_yaw)
-        
+
         self.linear_x = 0
         self.linear_y = 0
         self.angular_z = 0
-        
+
         pose = PoseWithCovarianceStamped()
         pose.header.frame_id = self.odom_frame_id
-        pose.header.stamp = self.clock().now().to_msg()
+        pose.header.stamp = self.clock.now().to_msg()
         pose.pose.pose = self.odom.pose.pose
         pose.pose.covariance = ODOM_POSE_COVARIANCE
         self.pose_pub.publish(pose)
 
+    def _clamp(self, msg):
+        msg.linear.x = max(-self.max_linear_x, min(self.max_linear_x, msg.linear.x))
+        msg.linear.y = max(-self.max_linear_y, min(self.max_linear_y, msg.linear.y))
+        msg.angular.z = max(-self.max_angular_z, min(self.max_angular_z, msg.angular.z))
+        return msg
+
     def app_cmd_vel_callback(self, msg):
-        if msg.linear.x > 0.2:
-            msg.linear.x = 0.2
-        if msg.linear.x < -0.2:
-            msg.linear.x = -0.2
-        if msg.linear.y > 0.2:
-            msg.linear.y = 0.2
-        if msg.linear.y < -0.2:
-            msg.linear.y = -0.2
-        if msg.angular.z > 0.5:
-            msg.angular.z = 0.5
-        if msg.angular.z < -0.5:
-            msg.angular.z = -0.5
-        self.cmd_vel_callback(msg)
+        self.cmd_vel_callback(self._clamp(msg))
 
     def cmd_vel_callback(self, msg):
-        # msg.linear.x *= self.linear_factor
-        # msg.linear.y *= self.linear_factor
-        # msg.angular.z *= self.angular_factor
+        # Both velocity entry points (Nav2/vel smoother 'cmd_vel' and upstream
+        # 'controller/cmd_vel') share the same clamp + freshness bookkeeping.
+        self._clamp(msg)
+        if self.estop:
+            return
+        self.last_cmd_at = time.time()
+        self.cmd_lost = False
         if self.machine_type == 'JetRover_Mecanum':
             self.linear_x = msg.linear.x
             self.linear_y = msg.linear.y
@@ -200,19 +249,16 @@ class Controller(Node):
             if abs(msg.linear.y) > 1e-8:
                 self.linear_x = 0.0
             else:
-                self.linear_x = msg.linear.x 
+                self.linear_x = msg.linear.x
             self.linear_y = 0.0
 
         if self.machine_type != 'JetRover_Acker':
             self.angular_z = msg.angular.z
-            # speed = math.sqrt(self.linear_x ** 2 + self.linear_y ** 2)
-            # direction = math.atan2(self.linear_x, self.linear_y)
-            # direction = math.pi * 2 + direction if direction < 0 else direction
             speeds = self.mecanum.set_velocity(self.linear_x, self.linear_y, self.angular_z)
             self.motor_pub.publish(speeds)
         elif self.machine_type == 'JetRover_Acker':
             if msg.angular.z != 0:
-                r = self.linear_x/msg.angular.z
+                r = self.linear_x / msg.angular.z
                 if r == 0:
                     self.angular_z = 0.0
                 else:
@@ -222,10 +268,13 @@ class Controller(Node):
             servo_state = BusServoState()
             servo_state.present_id = [1, 9]
             speeds = self.ackermann.set_velocity(self.linear_x, self.angular_z)
-            self.motor_pub.publish(speeds[1])
+            motors = MotorsState()
+            motors.data = speeds[1]
+            self.motor_pub.publish(motors)
 
             if speeds[0] is not None:
-                servo_state.position = [1, speeds[0]]
+                angle_pulse = int(round(min(max(speeds[0], 0.0), 1000.0)))
+                servo_state.position = [1, angle_pulse]
                 data = SetBusServoState()
                 data.state = [servo_state]
                 data.duration = 0.02
@@ -240,6 +289,21 @@ class Controller(Node):
                 # 计算时间间隔
                 self.dt = self.current_time - self.last_time
             self.odom.header.stamp = self.clock.now().to_msg()
+
+            # Command watchdog: if no fresh command arrives within cmd_timeout_sec
+            # (or an e-stop is latched), stop integrating the old speed and keep
+            # sending zero motor commands so the last motion command is revoked.
+            stale = (self.cmd_timeout_sec > 0.0 and
+                     self.current_time - self.last_cmd_at > self.cmd_timeout_sec)
+            if self.estop or stale:
+                if not self.cmd_lost:
+                    self.cmd_lost = True
+                    self.get_logger().warn('\033[1;33mcmd_vel lost/e-stop -> STOP\033[0m')
+                self.linear_x = 0.0
+                self.linear_y = 0.0
+                self.angular_z = 0.0
+                if self.current_time - self.last_stop_sent > 1.0:
+                    self._publish_stop()
 
             self.x += math.cos(self.pose_yaw)*self.linear_x*self.dt - math.sin(self.pose_yaw)*self.linear_y*self.dt
             self.y += math.sin(self.pose_yaw)*self.linear_x*self.dt + math.cos(self.pose_yaw)*self.linear_y*self.dt

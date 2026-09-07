@@ -105,8 +105,10 @@ class CrossBridgeNode(Node):
             except queue.Empty:
                 if not self.running:
                     break
-                else:
-                    continue
+                # Depth stream stalled: revoke any motion started before the stall.
+                self.twist = Twist()
+                self.mecanum_pub.publish(self.twist)
+                continue
             depth_color_map = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.45), cv2.COLORMAP_JET)
             cv2.circle(depth_color_map, (int((self.left_roi[2] + self.left_roi[3]) / 2), int((self.left_roi[0] + self.left_roi[1]) / 2)), 10, (0, 0, 0), -1)
             cv2.circle(depth_color_map, (int((self.center_roi[2] + self.center_roi[3]) / 2), int((self.center_roi[0] + self.center_roi[1]) / 2)), 10, (0, 0, 0), -1)

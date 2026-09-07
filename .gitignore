@@ -23,3 +23,6 @@ src/example/example/mediapipe_example/model/
 # SLAM maps (usually generated)
 src/slam/maps/*
 !src/slam/maps/.gitignore
+
+# claude space
+.claude/*

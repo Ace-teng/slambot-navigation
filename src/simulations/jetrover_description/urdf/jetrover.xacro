@@ -9,6 +9,9 @@
     <xacro:if value="${lidar in ['A1', 'A2', 'S2L', 'LD14P']}">
         <xacro:include filename="$(find jetrover_description)/urdf/lidar_a1.urdf.xacro"/>
     </xacro:if>
+    <xacro:if value="${lidar in ['LD19']}">
+        <xacro:include filename="$(find jetrover_description)/urdf/lidar_ld19.urdf.xacro"/>
+    </xacro:if>
     <xacro:if value="${lidar in ['G4']}">
         <xacro:include filename="$(find jetrover_description)/urdf/lidar_g4.urdf.xacro"/>
     </xacro:if>

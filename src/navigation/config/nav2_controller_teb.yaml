@@ -45,7 +45,7 @@ controller_server:
 
       footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
         type: "circular"
-        radius: 0.05 # for type "circular"
+        radius: 0.18 # for type "circular" - match the costmap robot_radius (was 0.05)
 
       # GoalTolerance
       free_goal_vel: True

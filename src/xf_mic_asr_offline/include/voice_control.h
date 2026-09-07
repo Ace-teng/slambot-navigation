@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <thread>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <record_param.h>
@@ -32,6 +33,7 @@ private:
     const char str_none = ' ';
 
 	rclcpp::Time start_time,last_time;
+	std::thread cal_task_;
 	rclcpp::Publisher<std_msgs::msg::String>::SharedPtr voice_words_pub;
 	rclcpp::Publisher<ros_robot_controller_msgs::msg::BuzzerState>::SharedPtr buzzer_pub;
     rclcpp::Service<xf_mic_asr_offline_msgs::srv::GetOfflineResult>::SharedPtr get_offline_result_srv_;

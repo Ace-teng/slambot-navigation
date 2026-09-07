@@ -27,6 +27,8 @@ class VoiceControlGarbageClassificationNode(Node):
         self.client.wait_for_service()
         self.start_client = self.create_client(Trigger, '/garbage_classification/start', callback_group=timer_cb_group)
         self.start_client.wait_for_service()
+        self.stop_client = self.create_client(Trigger, '/garbage_classification/stop', callback_group=timer_cb_group)
+        self.stop_client.wait_for_service()
         self.play('running')
 
         self.get_logger().info('唤醒口令: 小幻小幻(Wake up word: hello hiwonder)')
@@ -62,7 +64,7 @@ class VoiceControlGarbageClassificationNode(Node):
                 else:
                     self.play('open_fail')
             elif words == '关闭垃圾分类' or words == 'stop sort waste':
-                res = self.send_request(self.start_client, Trigger.Request())
+                res = self.send_request(self.stop_client, Trigger.Request())
                 if res.success:
                     self.play('close_success')
                 else:

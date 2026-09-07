@@ -14,7 +14,7 @@ from std_msgs.msg import UInt16
 from sensor_msgs.msg import Imu, Joy
 from ros_robot_controller.ros_robot_controller_sdk import Board
 from ros_robot_controller_msgs.srv import GetBusServoState, GetPWMServoState
-from ros_robot_controller_msgs.msg import ButtonState, BuzzerState, LedState, MotorsState, BusServoState, SetBusServoState, ServosPosition, SetPWMServoState, Sbus, OLEDState
+from ros_robot_controller_msgs.msg import ButtonState, BuzzerState, LedState, MotorsState, BusServoState, SetBusServoState, ServosPosition, SetPWMServoState, PWMServoState, Sbus, OLEDState
 
 class RosRobotController(Node):
     gravity = 9.80665
@@ -96,9 +96,9 @@ class RosRobotController(Node):
         if data != []:
             self.board.pwm_servo_set_position(msg.duration, data)
 
-    def get_pwm_servo_state(self, msg):
+    def get_pwm_servo_state(self, request, response):
         states = []
-        for i in msg.cmd:
+        for i in request.cmd:
             data = PWMServoState()
             if i.get_position:
                 state = self.board.pwm_servo_read_position(i.id)
@@ -109,7 +109,9 @@ class RosRobotController(Node):
                 if state is not None:
                     data.offset = state
             states.append(data)
-        return [True, states]
+        response.state = states
+        response.success = True
+        return response
 
     def set_bus_servo_position(self, msg):
         data = []
@@ -174,7 +176,7 @@ class RosRobotController(Node):
                 if state is not None:
                     data.offset = state
             if i.get_voltage:
-                state = self.board.bus_servo_read_voltage(i.id)
+                state = self.board.bus_servo_read_vin(i.id)
                 if state is not None:
                     data.voltage = state
             if i.get_temperature:
@@ -194,7 +196,7 @@ class RosRobotController(Node):
                 if state is not None:
                     data.max_temperature_limit = state
             if i.get_torque_state:
-                state = self.board.bus_servo_read_torque(i.id)
+                state = self.board.bus_servo_read_torque_state(i.id)
                 if state is not None:
                     data.enable_torque = state
             states.append(data)

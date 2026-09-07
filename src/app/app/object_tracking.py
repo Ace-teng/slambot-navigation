@@ -135,6 +135,8 @@ class OjbectTrackingNode(Node):
             try:
                 image = self.image_queue.get(block=True, timeout=1)
             except queue.Empty:
+                # Camera stream stalled: revoke motion started before the stall.
+                self.mecanum_pub.publish(Twist())
                 continue
 
             result = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
@@ -161,7 +163,8 @@ class OjbectTrackingNode(Node):
         with self.lock:
             try:
                 if self.image_sub is not None:
-                    self.image_sub.unregister()
+                    self.destroy_subscription(self.image_sub)
+                    self.image_sub = None
             except Exception as e:
                 self.get_logger().error(str(e))
             self.is_running = False
@@ -181,7 +184,8 @@ class OjbectTrackingNode(Node):
         with self.lock:
             try:
                 if self.image_sub is not None:
-                    self.image_sub.unregister()
+                    self.destroy_subscription(self.image_sub)
+                    self.image_sub = None
             except Exception as e:
                 self.get_logger().error(str(e))
             self.is_running = False
