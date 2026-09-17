@@ -63,6 +63,12 @@ export MACHINE_TYPE=JetRover_Mecanum LIDAR_TYPE=A1
 
 ## Launch entries
 
+- PC-only LanderPi city/industrial simulation:
+  - Build: `./scripts/pc_sim/build.sh`
+  - Staged planning and obstacle avoidance: `./scripts/pc_sim/start.sh demo`
+  - Interactive navigation with the complete prebuilt map: `./scripts/pc_sim/start.sh navigation`
+  - Online mapping: `./scripts/pc_sim/start.sh mapping`
+  - Details: `src/simulations/landerpi_gazebo_sim/README.md`
 - 2D mapping: `ros2 launch slam slam.launch.py sim:=false`
 - RTAB-Map 3D mapping: `ros2 launch slam rtabmap_slam.launch.py sim:=false` — starts
   a new map only when `clear_db:=true` is given; otherwise the previous database

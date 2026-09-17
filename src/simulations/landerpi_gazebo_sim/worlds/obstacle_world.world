@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="landerpi_city_industrial_world">
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+    <physics type="ode">
+      <real_time_update_rate>1000</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+    </physics>
+    <gui fullscreen="0">
+      <camera name="city_overview"><pose>0 -13 14 0 0.72 1.57</pose></camera>
+    </gui>
+
+    <!-- Asphalt strips are visual landmarks; LiDAR mapping uses the raised geometry below. -->
+    <model name="roads"><static>true</static><link name="link">
+      <visual name="south_road"><pose>0 -3.5 0.006 0 0 0</pose><geometry><box><size>13.6 1.5 0.01</size></box></geometry><material><ambient>0.12 0.13 0.15 1</ambient></material></visual>
+      <visual name="middle_road"><pose>0 0 0.007 0 0 0</pose><geometry><box><size>13.6 1.25 0.01</size></box></geometry><material><ambient>0.12 0.13 0.15 1</ambient></material></visual>
+      <visual name="north_road"><pose>0 3.75 0.006 0 0 0</pose><geometry><box><size>13.6 1.35 0.01</size></box></geometry><material><ambient>0.12 0.13 0.15 1</ambient></material></visual>
+      <visual name="west_road"><pose>-5.55 0 0.008 0 0 0</pose><geometry><box><size>1.35 9.8 0.01</size></box></geometry><material><ambient>0.12 0.13 0.15 1</ambient></material></visual>
+      <visual name="central_road"><pose>-0.7 0 0.009 0 0 0</pose><geometry><box><size>1.30 9.8 0.01</size></box></geometry><material><ambient>0.12 0.13 0.15 1</ambient></material></visual>
+      <visual name="east_road"><pose>5.65 0 0.008 0 0 0</pose><geometry><box><size>1.35 9.8 0.01</size></box></geometry><material><ambient>0.12 0.13 0.15 1</ambient></material></visual>
+    </link></model>
+
+    <!-- Outer city boundary. -->
+    <model name="north_boundary"><static>true</static><pose>0 5 0.5 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>14 0.14 1.0</size></box></geometry></collision><visual name="v"><geometry><box><size>14 0.14 1.0</size></box></geometry><material><ambient>0.72 0.72 0.75 1</ambient></material></visual></link></model>
+    <model name="south_boundary"><static>true</static><pose>0 -5 0.5 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>14 0.14 1.0</size></box></geometry></collision><visual name="v"><geometry><box><size>14 0.14 1.0</size></box></geometry><material><ambient>0.72 0.72 0.75 1</ambient></material></visual></link></model>
+    <model name="east_boundary"><static>true</static><pose>7 0 0.5 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.14 10 1.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.14 10 1.0</size></box></geometry><material><ambient>0.72 0.72 0.75 1</ambient></material></visual></link></model>
+    <model name="west_boundary"><static>true</static><pose>-7 0 0.5 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.14 10 1.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.14 10 1.0</size></box></geometry><material><ambient>0.72 0.72 0.75 1</ambient></material></visual></link></model>
+
+    <!-- Urban district: building footprints create the strong black contours in RViz. -->
+    <model name="office_west_south"><static>true</static><pose>-3.55 -1.78 0.9 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>2.75 1.65 1.8</size></box></geometry></collision><visual name="v"><geometry><box><size>2.75 1.65 1.8</size></box></geometry><material><ambient>0.40 0.48 0.58 1</ambient></material></visual></link></model>
+    <model name="office_west_north"><static>true</static><pose>-3.70 1.75 1.15 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>2.45 1.70 2.3</size></box></geometry></collision><visual name="v"><geometry><box><size>2.45 1.70 2.3</size></box></geometry><material><ambient>0.52 0.45 0.38 1</ambient></material></visual></link></model>
+    <model name="warehouse_center_south"><static>true</static><pose>1.45 -1.72 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>3.00 1.75 1.5</size></box></geometry></collision><visual name="v"><geometry><box><size>3.00 1.75 1.5</size></box></geometry><material><ambient>0.48 0.50 0.52 1</ambient></material></visual></link></model>
+    <model name="warehouse_east_south"><static>true</static><pose>4.25 -1.72 0.7 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>1.35 1.75 1.4</size></box></geometry></collision><visual name="v"><geometry><box><size>1.35 1.75 1.4</size></box></geometry><material><ambient>0.55 0.46 0.34 1</ambient></material></visual></link></model>
+
+    <!-- Small roadside structures create varied map outlines. -->
+    <model name="shop_1"><static>true</static><pose>-5.55 -1.35 0.55 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.65 0.75 1.1</size></box></geometry></collision><visual name="v"><geometry><box><size>0.65 0.75 1.1</size></box></geometry><material><ambient>0.76 0.55 0.25 1</ambient></material></visual></link></model>
+    <model name="shop_2"><static>true</static><pose>-5.55 1.30 0.55 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.65 0.90 1.1</size></box></geometry></collision><visual name="v"><geometry><box><size>0.65 0.90 1.1</size></box></geometry><material><ambient>0.76 0.55 0.25 1</ambient></material></visual></link></model>
+    <model name="utility_building"><static>true</static><pose>-1.70 2.05 0.65 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.75 1.15 1.3</size></box></geometry></collision><visual name="v"><geometry><box><size>0.75 1.15 1.3</size></box></geometry><material><ambient>0.35 0.55 0.45 1</ambient></material></visual></link></model>
+
+    <!-- Industrial tank farm, enclosed by a fence with a south-side entrance. -->
+    <model name="tank_farm_north_fence"><static>true</static><pose>2.55 3.00 0.45 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>4.30 0.10 0.9</size></box></geometry></collision><visual name="v"><geometry><box><size>4.30 0.10 0.9</size></box></geometry><material><ambient>0.65 0.68 0.70 1</ambient></material></visual></link></model>
+    <model name="tank_farm_west_fence"><static>true</static><pose>0.40 1.75 0.45 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.10 2.60 0.9</size></box></geometry></collision><visual name="v"><geometry><box><size>0.10 2.60 0.9</size></box></geometry><material><ambient>0.65 0.68 0.70 1</ambient></material></visual></link></model>
+    <model name="tank_farm_east_fence"><static>true</static><pose>4.70 1.75 0.45 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>0.10 2.60 0.9</size></box></geometry></collision><visual name="v"><geometry><box><size>0.10 2.60 0.9</size></box></geometry><material><ambient>0.65 0.68 0.70 1</ambient></material></visual></link></model>
+    <model name="tank_farm_south_fence_left"><static>true</static><pose>1.05 0.50 0.45 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>1.30 0.10 0.9</size></box></geometry></collision><visual name="v"><geometry><box><size>1.30 0.10 0.9</size></box></geometry><material><ambient>0.65 0.68 0.70 1</ambient></material></visual></link></model>
+    <model name="tank_farm_south_fence_right"><static>true</static><pose>3.90 0.50 0.45 0 0 0</pose><link name="link"><collision name="c"><geometry><box><size>1.60 0.10 0.9</size></box></geometry></collision><visual name="v"><geometry><box><size>1.60 0.10 0.9</size></box></geometry><material><ambient>0.65 0.68 0.70 1</ambient></material></visual></link></model>
+
+    <model name="oil_tank_1"><static>true</static><pose>1.30 1.20 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry><material><ambient>0.82 0.84 0.86 1</ambient></material></visual></link></model>
+    <model name="oil_tank_2"><static>true</static><pose>2.55 1.20 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry><material><ambient>0.82 0.84 0.86 1</ambient></material></visual></link></model>
+    <model name="oil_tank_3"><static>true</static><pose>3.80 1.20 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry><material><ambient>0.82 0.84 0.86 1</ambient></material></visual></link></model>
+    <model name="oil_tank_4"><static>true</static><pose>1.30 2.30 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry><material><ambient>0.82 0.84 0.86 1</ambient></material></visual></link></model>
+    <model name="oil_tank_5"><static>true</static><pose>2.55 2.30 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry><material><ambient>0.82 0.84 0.86 1</ambient></material></visual></link></model>
+    <model name="oil_tank_6"><static>true</static><pose>3.80 2.30 0.75 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.43</radius><length>1.50</length></cylinder></geometry><material><ambient>0.82 0.84 0.86 1</ambient></material></visual></link></model>
+
+    <!-- Traffic islands make the road map less rectangular and force local avoidance. -->
+    <model name="traffic_island_west"><static>true</static><pose>-3.0 0 0.28 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.30</radius><length>0.56</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.30</radius><length>0.56</length></cylinder></geometry><material><ambient>0.20 0.65 0.25 1</ambient></material></visual></link></model>
+    <model name="traffic_island_east"><static>true</static><pose>4.40 0 0.28 0 0 0</pose><link name="link"><collision name="c"><geometry><cylinder><radius>0.28</radius><length>0.56</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.28</radius><length>0.56</length></cylinder></geometry><material><ambient>0.20 0.65 0.25 1</ambient></material></visual></link></model>
+  </world>
+</sdf>

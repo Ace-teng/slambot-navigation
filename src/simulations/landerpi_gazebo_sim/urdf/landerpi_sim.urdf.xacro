@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="landerpi_sim">
+  <xacro:property name="wheel_radius" value="0.048"/>
+  <xacro:property name="wheel_width" value="0.026"/>
+
+  <material name="blue"><color rgba="0.05 0.30 0.80 1"/></material>
+  <material name="black"><color rgba="0.04 0.04 0.04 1"/></material>
+  <material name="silver"><color rgba="0.55 0.58 0.62 1"/></material>
+
+  <link name="base_footprint"/>
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.075"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <geometry><box size="0.25 0.20 0.09"/></geometry>
+      <material name="blue"/>
+    </visual>
+    <collision><geometry><box size="0.25 0.20 0.09"/></geometry></collision>
+    <inertial>
+      <mass value="3.0"/>
+      <inertia ixx="0.0120" ixy="0" ixz="0" iyy="0.0190" iyz="0" izz="0.0260"/>
+    </inertial>
+  </link>
+
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}">
+      <visual>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.12"/>
+        <inertia ixx="0.00008" ixy="0" ixz="0" iyy="0.00014" iyz="0" izz="0.00008"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/><child link="${name}"/>
+      <origin xyz="${x} ${y} -0.027"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="front_left_wheel" x="0.085" y="0.113"/>
+  <xacro:wheel name="front_right_wheel" x="0.085" y="-0.113"/>
+  <xacro:wheel name="rear_left_wheel" x="-0.085" y="0.113"/>
+  <xacro:wheel name="rear_right_wheel" x="-0.085" y="-0.113"/>
+
+  <link name="lidar_link">
+    <visual><geometry><cylinder radius="0.038" length="0.035"/></geometry><material name="silver"/></visual>
+    <collision><geometry><cylinder radius="0.038" length="0.035"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="0.00004" ixy="0" ixz="0" iyy="0.00004" iyz="0" izz="0.00006"/></inertial>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/><child link="lidar_link"/><origin xyz="0 0 0.085"/>
+  </joint>
+
+  <gazebo reference="base_link"><material>Gazebo/Blue</material></gazebo>
+  <gazebo reference="front_left_wheel"><material>Gazebo/Black</material><mu1>0.1</mu1><mu2>0.1</mu2></gazebo>
+  <gazebo reference="front_right_wheel"><material>Gazebo/Black</material><mu1>0.1</mu1><mu2>0.1</mu2></gazebo>
+  <gazebo reference="rear_left_wheel"><material>Gazebo/Black</material><mu1>0.1</mu1><mu2>0.1</mu2></gazebo>
+  <gazebo reference="rear_right_wheel"><material>Gazebo/Black</material><mu1>0.1</mu1><mu2>0.1</mu2></gazebo>
+
+  <gazebo>
+    <plugin name="landerpi_planar_drive" filename="libgazebo_ros_planar_move.so">
+      <ros>
+        <namespace>/</namespace>
+        <remapping>cmd_vel:=cmd_vel</remapping>
+        <remapping>odom:=odom</remapping>
+      </ros>
+      <update_rate>50.0</update_rate>
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_tf>true</publish_tf>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="lidar_link">
+    <sensor name="landerpi_lidar" type="ray">
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <update_rate>10</update_rate>
+      <ray>
+        <scan><horizontal><samples>720</samples><resolution>1</resolution><min_angle>-${pi}</min_angle><max_angle>${pi}</max_angle></horizontal></scan>
+        <range><min>0.12</min><max>12.0</max><resolution>0.01</resolution></range>
+        <noise><type>gaussian</type><mean>0.0</mean><stddev>0.005</stddev></noise>
+      </ray>
+      <plugin name="landerpi_laser" filename="libgazebo_ros_ray_sensor.so">
+        <ros><remapping>~/out:=scan</remapping></ros>
+        <output_type>sensor_msgs/LaserScan</output_type>
+        <frame_name>lidar_link</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+</robot>
