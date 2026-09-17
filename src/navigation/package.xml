@@ -3,12 +3,24 @@
 <package format="3">
   <name>navigation</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>SLAM exploration and navigation utilities.</description>
   <maintainer email="1270161395@qq.com">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
-  <!-- Runtime packages required to actually run the launch chains in this package
-       (RTAB-Map localization, its base robot stack and the camera driver). -->
+  <!-- Dependencies for the custom autonomous exploration node. -->
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+
+  <!-- Runtime packages required by the existing navigation launch chains. -->
   <exec_depend>rtabmap_sync</exec_depend>
   <exec_depend>rtabmap_slam</exec_depend>
   <exec_depend>orbbec_camera</exec_depend>

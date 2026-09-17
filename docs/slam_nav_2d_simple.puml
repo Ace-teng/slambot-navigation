@@ -1,0 +1,39 @@
+@startuml slam_nav_2d_simple
+title JetRover 2D SLAM 建图 + 导航 —— 系统级架构（ROS 2 Humble）
+
+skinparam componentStyle rectangle
+skinparam roundCorner 10
+skinparam defaultTextAlignment center
+skinparam ArrowThickness 1.6
+skinparam ArrowColor #444444
+skinparam nodesep 30
+skinparam ranksep 150
+skinparam packageStyle frame
+
+package "建图会话" as map_session {
+  component "在线 2D 建图\n━━━━━━\n激光雷达实时构建栅格地图\n发布 /map 与 TF map→odom" as stb
+}
+
+database "地图文件\n(map_01.pgm/.yaml)" as mapfile
+
+package "导航会话" as nav_session {
+  component "地图加载与定位\n━━━━━━\n加载静态地图 + 粒子滤波定位\n发布 TF map→odom" as loc
+  component "自主导航\n━━━━━━\n行为树调度：全局规划 · 局部控制\n路径平滑 · 恢复行为\n发布 /cmd_vel" as nav2
+}
+
+component "感知与状态估计（两会话共用）\n━━━━━━\n2D 雷达测距 → 发布 /scan\n惯性测量 · 手柄/键盘遥控\n多传感器融合 → 发布 /odom 与 TF odom→base" as base
+
+component "安全控制与底盘硬件\n━━━━━━\n速度限幅 · 指令看门狗 · 急停\n串口下发电机/舵机指令" as hw #f5f5dc
+
+' 顶部横链：建图 → 地图产物 → 导航
+stb -right-> mapfile : 建图完成后\n保存
+mapfile -right-> loc : 导航时加载
+loc -right-> nav2 : TF map→odom
+
+' 垂直主干：导航栈 ↓ 感知/控制 ↓ 底盘
+nav2 -down-> base : /cmd_vel\n⇅ /scan · /odom
+base -down-> hw : 指令\n⇅ 编码器 · IMU
+
+' 反馈边最后声明：建图会话的传感器输入
+base <-> stb : /scan · /odom · TF
+@enduml

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gazebo 仿真替身模型：尺寸/坐标系沿用 JetRover_Mecanum 真值
+     （轴距 x ±0.0975、轮距 y ±0.112、轮半径 0.048、base 抬升 0.116，
+     lidar 安装位 base_link +[0.09, 0, 0.0405]），但全部用基础几何体，
+     不依赖未提交的 meshes/。
+     运动：libgazebo_ros_planar_move（cmd_vel -> odom + TF），
+     传感：lidar_link 上挂 ray 传感器直接发 /scan（真机的 laser_filters
+     链不参与仿真）。 -->
+<robot name="jetrover_sim" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:property name="M_PI" value="3.1415926535897931"/>
+  <xacro:property name="wheel_r" value="0.048"/>
+  <xacro:property name="wheel_w" value="0.045"/>
+
+  <link name="base_footprint"/>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.116" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+      <mass value="2.5"/>
+      <inertia ixx="0.023" ixy="0" ixz="0" iyy="0.052" iyz="0" izz="0.066"/>
+    </inertial>
+    <visual>
+      <!-- Keep the lidar origin above the simplified chassis.  The real
+           model's base_link is near the chassis top, not at box center. -->
+      <origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <geometry><box size="0.30 0.20 0.10"/></geometry>
+      <material name="green"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <geometry><box size="0.30 0.20 0.10"/></geometry>
+    </collision>
+  </link>
+
+  <!-- 四轮仅作展示（fixed）；运动学由 planar_move 插件直接驱动模型 -->
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}">
+      <inertial>
+        <mass value="0.12"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+      <visual>
+        <origin rpy="${M_PI/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_r}" length="${wheel_w}"/></geometry>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <origin rpy="${M_PI/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_r}" length="${wheel_w}"/></geometry>
+      </collision>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${y} -0.0678" rpy="0 0 0"/>
+    </joint>
+    <!-- The planar-move plugin supplies chassis motion directly.  Fixed
+         display wheels therefore need zero tangential friction, while
+         normal contact still prevents penetration. -->
+    <gazebo reference="${name}">
+      <mu1>0.0</mu1>
+      <mu2>0.0</mu2>
+    </gazebo>
+  </xacro:macro>
+  <xacro:wheel name="wheel_left_front_link"  x="0.0975"  y="0.112"/>
+  <xacro:wheel name="wheel_left_back_link"   x="-0.0975" y="0.112"/>
+  <xacro:wheel name="wheel_right_front_link" x="0.0975"  y="-0.112"/>
+  <xacro:wheel name="wheel_right_back_link"  x="-0.0975" y="-0.112"/>
+
+  <link name="lidar_link">
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00003" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00004"/>
+    </inertial>
+    <visual>
+      <geometry><cylinder radius="0.03" length="0.04"/></geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0.09 0 0.0405" rpy="0 0 0"/>
+  </joint>
+
+  <material name="green"><color rgba="0.2 0.7 0.3 1"/></material>
+  <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
+
+  <gazebo reference="base_link"><material>Gazebo/Green</material></gazebo>
+  <gazebo reference="lidar_link"><material>Gazebo/Black</material></gazebo>
+
+  <gazebo reference="lidar_link">
+    <sensor type="ray" name="lidar">
+      <visualize>true</visualize>
+      <update_rate>10</update_rate>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-${M_PI}</min_angle>
+            <max_angle>${M_PI}</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </ray>
+      <plugin name="lidar_plugin" filename="libgazebo_ros_ray_sensor.so">
+        <ros>
+          <remapping>~/out:=scan</remapping>
+        </ros>
+        <output_type>sensor_msgs/LaserScan</output_type>
+        <frame_name>lidar_link</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <gazebo>
+    <plugin name="planar_move" filename="libgazebo_ros_planar_move.so">
+      <ros>
+        <remapping>cmd_vel:=cmd_vel</remapping>
+        <remapping>odom:=odom</remapping>
+      </ros>
+      <update_rate>50</update_rate>
+      <publish_rate>50</publish_rate>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <covariance_x>0.0001</covariance_x>
+      <covariance_y>0.0001</covariance_y>
+      <covariance_yaw>0.01</covariance_yaw>
+    </plugin>
+  </gazebo>
+</robot>

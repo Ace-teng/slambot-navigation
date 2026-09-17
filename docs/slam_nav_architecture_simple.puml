@@ -1,0 +1,32 @@
+@startuml slam_nav_architecture_simple
+title JetRover slambot-navigation —— 系统级架构（ROS 2 Humble）
+
+skinparam componentStyle rectangle
+skinparam roundCorner 8
+skinparam defaultTextAlignment center
+skinparam ArrowThickness 1.6
+skinparam ArrowColor #444444
+skinparam nodesep 30
+skinparam ranksep 55
+
+component "感知外设\n━━━━━━━━\n2D 雷达 + laser_filters → /scan\nOrbbec 深度相机\nIMU · 遥控(joystick)" as sens
+
+component "建图 · 定位\n━━━━━━━━\nslam_toolbox(2D) / RTAB-Map(3D)\nAMCL + map_server / RTAB-Map 定位\n发布 /map 与 TF map→odom（互斥）" as slam
+
+component "Nav2 导航栈\n━━━━━━━━\nbt_navigator 行为树\n（导航 · 路径平滑 · 恢复行为）\nplanner(NavFn) · controller(DWB/TEB)\nvelocity_smoother" as nav2
+
+component "状态估计 · 安全控制\n━━━━━━━━\nekf_node：odom_raw + IMU → /odom\nodom_publisher：限幅 · 看门狗 · 急停" as ctrl
+
+component "底盘硬件\n━━━━━━━━\nros_robot_controller 串口驱动\nMCU：电机 / 舵机 / 编码器 / IMU" as mcu #f5f5dc
+
+note top of sens
+入口：slam / navigation / rtabmap_navigation /
+auto_nav_mapping_standalone 等 launch，按业务链裁剪节点组合
+end note
+
+sens <-> slam : 传感器流（/scan · rgb/depth）⇅ TF
+slam -down-> nav2 : /map + TF map→odom
+sens -down-> nav2 : /scan（代价地图）
+nav2 <-> ctrl : /cmd_vel 指令 ⇅ /odom_raw · IMU · estop
+ctrl <-> mcu : 电机/舵机指令 ⇅ 编码器 · IMU 数据
+@enduml

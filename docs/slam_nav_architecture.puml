@@ -1,0 +1,121 @@
+@startuml slam_nav_architecture
+title JetRover slambot-navigation —— SLAM 建图 + Nav2 导航架构（ROS 2 Humble）
+
+skinparam componentStyle rectangle
+skinparam roundCorner 8
+skinparam defaultTextAlignment center
+skinparam packageStyle rectangle
+skinparam nodesep 10
+skinparam ranksep 45
+skinparam ArrowThickness 1.2
+skinparam ArrowColor #555555
+
+legend bottom
+━━ TF 树 ━━
+map → odom: 由建图(slam_toolbox / RTAB-Map)或 AMCL 发布（互斥，同一时刻只能一方发布）
+odom → base_footprint: ekf_node 发布；base_footprint 以下由 robot_state_publisher 按 URDF 发布
+━━ 机型选择 ━━
+MACHINE_TYPE = JetRover_{Mecanum,Tank,Acker}   LIDAR_TYPE = {A1,G4,LD19,...}
+sim:=true 且 use_real_hw:=false 时不启动任何真实驱动（sim ≠ 硬件安全开关）
+endlegend
+
+package "① Launch 入口层（5 条业务链，均 include robot.launch.py）" as entry {
+  [slam.launch.py\n2D 建图] as L_SLAM
+  [rtabmap_slam.launch.py\n3D 建图] as L_RTAB3D
+  [navigation.launch.py\nAMCL + 静态地图导航\nmap:=map_01] as L_NAV
+  [rtabmap_navigation.launch.py\nRTAB-Map 定位 + 导航] as L_RNAV
+  [auto_nav_mapping_standalone.launch.py\n边建图边导航] as L_AUTO
+}
+
+package "② 外设与状态估计（robot.launch.py）" as hw {
+  package "peripherals 外设" as peri {
+    [雷达驱动\n按 LIDAR_TYPE 选择] as LIDAR
+    [laser_filters\nscan_to_scan_filter_chain] as FILTER
+    [Orbbec 深度相机] as RGBD
+    [joystick_control\n遥控（默认开）] as JOY
+  }
+  package "driver 状态估计" as est {
+    [robot_state_publisher\njetrover_description\nURDF → TF] as RSP
+    [IMU 滤波链\nimu_calib + complementary] as IMUF
+    [ekf_node (robot_localization)\n融合 odom_raw + IMU → /odom\nTF: odom → base_footprint] as EKF
+  }
+}
+
+package "③ SLAM 建图层（2D / 3D 二选一）" as slam {
+  [slam_toolbox\nsync_slam_toolbox_node\nslam.yaml: res 0.05 · range 12m] as STB
+  [rtabmap + rgbd_sync\nRGB-D + LiDAR 3D 建图] as RTAB
+  database "rtabmap.db" as RTABDB
+}
+
+package "④ 定位层（导航时三选一，提供 /map + map→odom）" as loc {
+  [map_server\nslam/maps/map_01.yaml] as MS
+  [AMCL\n2D 粒子滤波定位] as AMCL
+  [rtabmap 定位模式\nMem/IncrementalMemory=false] as RTAB_LOC
+}
+
+package "⑤ Nav2 导航栈（navigation_base.launch.py）" as nav2 {
+  [bt_navigator\n行为树 navigate_to_pose_smooth.xml\nauto 参数改用无倒退版] as BTN
+  [planner_server\nNavFn 全局规划\nglobal_costmap ← /map] as PLN
+  [controller_server\nDWB（默认）/ TEB（use_teb:=true）\nlocal_costmap ← /scan] as CTL
+  [smoother_server\n路径平滑] as SMO
+  [behavior_server\nspin / backup / wait] as BEH
+  [waypoint_follower] as WPF
+  [velocity_smoother\n输出 /cmd_vel] as VSM
+  [lifecycle_manager\n统一启停] as LCM
+}
+
+package "⑥ 安全控制与执行层（controller.launch.py）" as act {
+  [odom_publisher\n速度限幅 0.2m/s · 0.5rad/s\n看门狗 0.3s · estop 服务\n~/estop / ~/estop_release] as ODOM
+  [servo_controller\n舵机/机械臂（无条件拉起）] as SERVO
+  [ros_robot_controller\nMCU 串口驱动\n/dev/rrc @ 1Mbaud] as RRC
+}
+
+component "MCU 主控板\n（真机硬件）" as mcu #f5f5dc
+
+' ── ① → ② ──
+entry -down-> hw
+L_AUTO ..> STB : 延时 10s
+L_AUTO ..> nav2 : 延时 15s\nrtabmap:=true 跳过 AMCL/map_server
+
+' ── 感知数据流 ──
+LIDAR -right-> FILTER : /scan_raw
+FILTER -down-> STB : /scan
+FILTER --> AMCL : /scan
+FILTER --> CTL : /scan（局部代价地图）
+RGBD --> RTAB : rgb / depth / camera_info
+RGBD --> RTAB_LOC
+
+' ── 里程计与 TF ──
+ODOM -up-> EKF : /odom_raw
+IMUF --> EKF : /imu/data
+RSP ..> EKF : TF
+EKF -down-> STB : /odom + TF odom→base_footprint
+EKF --> AMCL : TF
+EKF --> nav2 : TF
+
+' ── SLAM / 定位输出 ──
+STB --> loc : /map + TF map→odom
+RTAB --> RTABDB
+RTAB_LOC --> nav2 : /map + TF map→odom
+MS --> AMCL : 静态地图
+AMCL -down-> nav2 : TF map→odom
+
+' ── Nav2 内部 ──
+LCM ..> nav2 : 生命周期管理
+BTN --> PLN : ComputePathToPose
+BTN --> SMO : SmoothPath
+BTN --> CTL : FollowPath
+BTN --> BEH : 恢复行为
+CTL --> VSM : /cmd_vel
+
+' ── 控制输出链 ──
+VSM -down-> ODOM : /cmd_vel
+JOY --> ODOM : /controller/cmd_vel
+ODOM --> RRC : MotorsState\nros_robot_controller/set_motor
+ODOM --> SERVO : SetBusServoState\n（Acker 转向舵机）
+SERVO --> RRC
+RRC -down-> mcu : 串口帧
+
+' ── 建图产物回灌 ──
+STB ..> MS : scripts/save_map.sh\n/map → map_01.pgm/.yaml
+@enduml

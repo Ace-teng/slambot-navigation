@@ -1,0 +1,90 @@
+autonomous_exploration:
+  ros__parameters:
+    # Relative names inherit the launch namespace/robot_name.
+    map_topic: map
+    scan_topic: scan
+    odom_topic: odom
+    cmd_topic: controller/cmd_vel
+    goal_topic: goal_pose
+
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_footprint
+
+    control_frequency: 15.0
+    frontier_frequency: 1.0
+    occupied_threshold: 65
+    robot_radius: 0.18
+    safety_margin: 0.10
+
+    min_frontier_size: 5
+    frontier_goal_offset: 0.30
+    max_candidates: 12
+    exploration_strategy: dfs
+    # Directional depth-first frontier ordering: keep moving along one branch,
+    # prefer useful distant goals, and discourage revisiting branch points.
+    dfs_gain_scale: 0.25
+    dfs_heading_weight: 35.0
+    dfs_depth_weight: 12.0
+    dfs_depth_cap: 5.0
+    dfs_revisit_radius: 0.80
+    dfs_revisit_penalty: 60.0
+    dfs_branch_switch_angle: 1.40
+    dfs_stack_limit: 64
+    information_radius_cells: 8
+    risk_radius_cells: 4
+
+    w_gain: 1.0
+    w_path: 0.5
+    w_risk: 0.3
+    w_turn: 0.1
+    w_failure: 2.0
+    failure_blacklist_duration: 60.0
+
+    max_linear_speed: 0.20
+    min_linear_speed: 0.04
+    max_angular_speed: 0.50
+    lookahead: 0.45
+    lookahead_max: 0.80
+    lookahead_speed_gain: 1.50
+    goal_tolerance: 0.20
+    min_goal_distance: 0.80
+    path_deviation_tolerance: 0.60
+    progress_distance: 0.08
+    progress_angle: 0.15
+    rotate_in_place_angle: 1.20
+    corner_rounding_fraction: 0.35
+
+    slowdown_distance: 0.60
+    emergency_stop_distance: 0.28
+    side_clearance_distance: 0.34
+    side_hard_stop_distance: 0.20
+    side_min_turn_scale: 0.25
+
+    sensor_timeout: 1.0
+    odom_timeout: 1.0
+    tf_timeout: 1.0
+    map_timeout: 5.0
+    goal_timeout: 120.0
+    blocked_timeout: 5.0
+    stuck_timeout: 8.0
+    planning_timeout: 6.0
+    recovery_duration: 3.0
+    recovery_backup_duration: 0.8
+    recovery_linear_speed: 0.06
+    recovery_angular_speed: 0.35
+    recovery_backup_clearance: 0.35
+
+    initial_scan_enabled: true
+    initial_scan_speed: 0.25
+    initial_scan_duration: 30.0
+
+    map_stable_duration: 10.0
+    no_frontier_confirm_count: 3
+
+    auto_start: true
+    accept_external_goals: false
+    auto_save_map: true
+    map_save_service: slam_toolbox/save_map
+    map_save_name: exploration_map
+    map_save_timeout: 10.0

@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<!-- 8x8 m 方形场地：四周围墙 + 两根立柱 + 两个箱体，给 2D SLAM 足够特征 -->
+<sdf version="1.6">
+  <world name="sim_arena">
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 4 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>8 0.1 1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>8 0.1 1</size></box></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient></material></visual>
+      </link>
+    </model>
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -4 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>8 0.1 1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>8 0.1 1</size></box></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient></material></visual>
+      </link>
+    </model>
+    <model name="wall_east">
+      <static>true</static>
+      <pose>4 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.1 8 1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.1 8 1</size></box></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient></material></visual>
+      </link>
+    </model>
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-4 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.1 8 1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.1 8 1</size></box></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient></material></visual>
+      </link>
+    </model>
+
+    <model name="pillar_1">
+      <static>true</static>
+      <pose>1.5 1.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.2</radius><length>1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.2</radius><length>1</length></cylinder></geometry>
+          <material><ambient>0.9 0.4 0.1 1</ambient></material></visual>
+      </link>
+    </model>
+    <model name="pillar_2">
+      <static>true</static>
+      <pose>-1.5 -1.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.2</radius><length>1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.2</radius><length>1</length></cylinder></geometry>
+          <material><ambient>0.9 0.4 0.1 1</ambient></material></visual>
+      </link>
+    </model>
+
+    <model name="box_1">
+      <static>true</static>
+      <pose>2.5 -2 0.25 0 0 0.4</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6 0.6 0.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.6 0.6 0.5</size></box></geometry>
+          <material><ambient>0.2 0.5 0.9 1</ambient></material></visual>
+      </link>
+    </model>
+    <model name="box_2">
+      <static>true</static>
+      <pose>-2.5 2 0.25 0 0 0.9</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6 0.6 0.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.6 0.6 0.5</size></box></geometry>
+          <material><ambient>0.2 0.5 0.9 1</ambient></material></visual>
+      </link>
+    </model>
+  </world>
+</sdf>
